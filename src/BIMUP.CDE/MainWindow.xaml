@@ -470,25 +470,26 @@
                                             </Border>
 
                                             <DataGrid x:Name="GridFolders" BorderThickness="0"
+                                                      GridLinesVisibility="None"
                                                       MouseDoubleClick="GridFolders_MouseDoubleClick">
                                                 <DataGrid.Columns>
-                                                    <DataGridTemplateColumn Header="TÊN THƯ MỤC" Width="240" SortMemberPath="Name">
+                                                    <DataGridTemplateColumn Header="TÊN THƯ MỤC" Width="260" SortMemberPath="Name">
                                                         <DataGridTemplateColumn.CellTemplate>
                                                             <DataTemplate DataType="{x:Type models:AccFolder}">
-                                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                                    <ui:SymbolIcon Symbol="Folder24" Filled="True" FontSize="15"
-                                                                                   Foreground="{DynamicResource FolderGoldBrush}" Margin="0,0,6,0" />
-                                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="2,0">
+                                                                    <ui:SymbolIcon Symbol="Folder24" Filled="True" FontSize="17"
+                                                                                   Foreground="{DynamicResource FolderGoldBrush}" Margin="0,0,10,0" />
+                                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13"
                                                                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                                                 </StackPanel>
                                                             </DataTemplate>
                                                         </DataGridTemplateColumn.CellTemplate>
                                                     </DataGridTemplateColumn>
                                                     <DataGridTextColumn Header="ĐƯỜNG DẪN ĐẦY ĐỦ" Binding="{Binding FullPath}" Width="300" />
-                                                    <DataGridTemplateColumn Header="SỐ MỤC" Width="80" SortMemberPath="ObjectCount">
+                                                    <DataGridTemplateColumn Header="SỐ MỤC" Width="90" SortMemberPath="ObjectCount">
                                                         <DataGridTemplateColumn.CellTemplate>
                                                             <DataTemplate DataType="{x:Type models:AccFolder}">
-                                                                <Border CornerRadius="8" Padding="6,1" HorizontalAlignment="Left"
+                                                                <Border CornerRadius="10" Padding="8,2" HorizontalAlignment="Left"
                                                                         Background="{DynamicResource BIMUP.Fluent.Brush.Layer3}">
                                                                     <TextBlock Text="{Binding ObjectCount}" FontSize="11" FontWeight="SemiBold"
                                                                                Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" />
@@ -496,10 +497,10 @@
                                                             </DataTemplate>
                                                         </DataGridTemplateColumn.CellTemplate>
                                                     </DataGridTemplateColumn>
-                                                    <DataGridTextColumn Header="NGƯỜI TẠO" Binding="{Binding CreateUserName}" Width="130" />
-                                                    <DataGridTextColumn Header="NGÀY TẠO" Binding="{Binding CreateTime}" Width="120" />
-                                                    <DataGridTextColumn Header="NGƯỜI CẬP NHẬT" Binding="{Binding LastModifiedUserName}" Width="130" />
-                                                    <DataGridTextColumn Header="NGÀY CẬP NHẬT" Binding="{Binding LastModifiedTime}" Width="120" />
+                                                    <DataGridTextColumn Header="NGƯỜI TẠO" Binding="{Binding CreateUserName}" Width="140" />
+                                                    <DataGridTextColumn Header="NGÀY TẠO" Binding="{Binding CreateTime}" Width="130" />
+                                                    <DataGridTextColumn Header="NGƯỜI CẬP NHẬT" Binding="{Binding LastModifiedUserName}" Width="140" />
+                                                    <DataGridTextColumn Header="NGÀY CẬP NHẬT" Binding="{Binding LastModifiedTime}" Width="130" />
                                                     <DataGridTextColumn Header="FOLDER ID" Binding="{Binding Id}" Width="200" />
                                                 </DataGrid.Columns>
                                             </DataGrid>
@@ -533,15 +534,15 @@
                                                 </Grid>
                                             </Border>
 
-                                            <DataGrid x:Name="GridFiles" BorderThickness="0" IsReadOnly="False">
+                                            <DataGrid x:Name="GridFiles" BorderThickness="0" IsReadOnly="False" GridLinesVisibility="None">
                                                 <DataGrid.Columns>
                                                     <DataGridCheckBoxColumn Header="CHỌN" Binding="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" Width="52" />
                                                     <DataGridTemplateColumn Header="TÊN FILE" Width="260" SortMemberPath="FileName" IsReadOnly="True">
                                                         <DataGridTemplateColumn.CellTemplate>
                                                             <DataTemplate DataType="{x:Type models:AccFileItem}">
-                                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                                    <ui:SymbolIcon Symbol="DocumentText24" FontSize="15"
-                                                                                   Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" Margin="0,0,6,0" />
+                                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="2,0">
+                                                                    <ui:SymbolIcon Symbol="DocumentText24" FontSize="16"
+                                                                                   Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" Margin="0,0,8,0" />
                                                                     <TextBlock Text="{Binding FileName}" FontWeight="SemiBold"
                                                                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                                                 </StackPanel>
