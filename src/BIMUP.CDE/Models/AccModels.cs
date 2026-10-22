@@ -234,6 +234,8 @@ public class AccWorkflow
     public string ApprovalOptionsSummary { get; set; } = "";
     public string CopyFilesInfo { get; set; } = "";
     public string CopyTargetFolderUrn { get; set; } = "";
+    public string CopyTargetFolderPath { get; set; } = "";
+    public string CopyTargetFolderWebUrl { get; set; } = "";
     public bool CopyFilesEnabled { get; set; }
     public string CreatedAt { get; set; } = "";
     public string UpdatedAt { get; set; } = "";

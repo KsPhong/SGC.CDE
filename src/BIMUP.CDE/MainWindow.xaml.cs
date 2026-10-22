@@ -728,6 +728,17 @@ public partial class MainWindow : FluentWindow
 
             var workflows = await _api.GetApprovalWorkflowsAsync(projectId);
 
+            // Truy vấn đường dẫn thư mục và link ACC cho các workflow có cài đặt copy file
+            foreach (var wf in workflows)
+            {
+                if (wf.CopyFilesEnabled && !string.IsNullOrEmpty(wf.CopyTargetFolderUrn))
+                {
+                    var (fName, fPath, fWebUrl) = await _api.GetFolderMetadataAsync(projectId, wf.CopyTargetFolderUrn);
+                    wf.CopyTargetFolderPath = !string.IsNullOrEmpty(fPath) ? fPath : fName;
+                    wf.CopyTargetFolderWebUrl = fWebUrl;
+                }
+            }
+
             _allWorkflows.Clear();
             _allWorkflows.AddRange(workflows);
             ApplyWorkflowFilter();
@@ -1796,7 +1807,7 @@ public partial class MainWindow : FluentWindow
     {
         var border = new Border
         {
-            Width = 220,
+            Width = 280,
             MinHeight = 110,
             Background = new SolidColorBrush(Color.FromArgb(20, 16, 185, 129)),
             BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#10B981")),
@@ -1817,7 +1828,7 @@ public partial class MainWindow : FluentWindow
         };
         badgeBorder.Child = new WpfTextBlock
         {
-            Text = "HÀNH ĐỘNG SAU DUYỆT",
+            Text = "HÀNH ĐỘNG SAU DUYỆT (ACTION)",
             FontSize = 9.5,
             FontWeight = FontWeights.Bold,
             Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#10B981"))
@@ -1834,13 +1845,47 @@ public partial class MainWindow : FluentWindow
             Margin = new Thickness(0, 0, 0, 4)
         });
 
+        // Hiển thị đường dẫn thư mục đích rõ ràng
+        var displayPath = !string.IsNullOrEmpty(wf.CopyTargetFolderPath)
+            ? wf.CopyTargetFolderPath
+            : (!string.IsNullOrEmpty(wf.CopyTargetFolderUrn) ? wf.CopyTargetFolderUrn : "Thư mục cấu hình");
+
         stack.Children.Add(new WpfTextBlock
         {
-            Text = string.IsNullOrEmpty(wf.CopyTargetFolderUrn) ? "Đến thư mục cấu hình" : $"Đích: {wf.CopyTargetFolderUrn}",
-            FontSize = 10,
-            Foreground = (Brush)FindResource("BIMUP.Fluent.Brush.Fg2"),
-            TextWrapping = TextWrapping.Wrap
+            Text = $"Đích: {displayPath}",
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = (Brush)FindResource("BIMUP.Fluent.Brush.Fg1"),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 4)
         });
+
+        // Nếu có Web Link ACC thì thêm nút bấm mở trực tiếp trên trình duyệt
+        if (!string.IsNullOrEmpty(wf.CopyTargetFolderWebUrl))
+        {
+            var btnOpenAccFolder = new WpfButton
+            {
+                Content = "🔗 Mở thư mục trên ACC",
+                Style = (Style)FindResource("Btn.Subtle"),
+                FontSize = 10,
+                Height = 22,
+                Padding = new Thickness(4, 0, 4, 0),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                ToolTip = wf.CopyTargetFolderWebUrl
+            };
+            btnOpenAccFolder.Click += (s, e) =>
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(wf.CopyTargetFolderWebUrl) { UseShellExecute = true });
+                }
+                catch (Exception ex)
+                {
+                    AppendLog($"⚠️ Không thể mở link web: {ex.Message}");
+                }
+            };
+            stack.Children.Add(btnOpenAccFolder);
+        }
 
         border.Child = stack;
         return border;

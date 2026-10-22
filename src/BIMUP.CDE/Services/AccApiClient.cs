@@ -722,6 +722,76 @@ public class AccApiClient
     }
 
     /// <summary>
+    /// Lấy thông tin chi tiết thư mục (tên, đường dẫn phân cấp và link xem web trên ACC).
+    /// </summary>
+    public async Task<(string FolderName, string FullPath, string WebUrl)> GetFolderMetadataAsync(
+        string projectId,
+        string folderUrn,
+        CancellationToken ct = default)
+    {
+        var cleanProjId = CleanId(projectId);
+        var bProjId = $"b.{cleanProjId}";
+        try
+        {
+            var url = $"{BaseUrl}/data/v1/projects/{Uri.EscapeDataString(bProjId)}/folders/{Uri.EscapeDataString(folderUrn)}";
+            using var req = CreateGet(url);
+            using var resp = await _http.SendAsync(req, ct);
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            if (!resp.IsSuccessStatusCode)
+                return ("", "", "");
+
+            using var doc = JsonDocument.Parse(body);
+            var data = doc.RootElement.GetProperty("data");
+            var attrs = data.GetProperty("attributes");
+            var name = attrs.TryGetProperty("displayName", out var dn) && dn.ValueKind == JsonValueKind.String
+                ? dn.GetString()!
+                : (attrs.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "");
+
+            string webUrl = "";
+            if (data.TryGetProperty("links", out var links) &&
+                links.TryGetProperty("webView", out var webEl) &&
+                webEl.TryGetProperty("href", out var hrefEl))
+            {
+                webUrl = hrefEl.GetString() ?? "";
+            }
+
+            // Đệ quy lấy tên cha nếu có
+            var parentNames = new List<string>();
+            var curParentId = folderUrn;
+            for (int depth = 0; depth < 5; depth++)
+            {
+                var parentUrl = $"{BaseUrl}/data/v1/projects/{Uri.EscapeDataString(bProjId)}/folders/{Uri.EscapeDataString(curParentId)}/parent";
+                using var pReq = CreateGet(parentUrl);
+                using var pResp = await _http.SendAsync(pReq, ct);
+                if (!pResp.IsSuccessStatusCode) break;
+                var pBody = await pResp.Content.ReadAsStringAsync(ct);
+                using var pDoc = JsonDocument.Parse(pBody);
+                if (pDoc.RootElement.TryGetProperty("data", out var pData))
+                {
+                    var pAttrs = pData.GetProperty("attributes");
+                    var pName = pAttrs.TryGetProperty("displayName", out var pdn) && pdn.ValueKind == JsonValueKind.String
+                        ? pdn.GetString()!
+                        : (pAttrs.TryGetProperty("name", out var pn) ? pn.GetString() ?? "" : "");
+                    if (string.IsNullOrEmpty(pName) || pName.Equals("Project Files", StringComparison.OrdinalIgnoreCase))
+                        break;
+                    parentNames.Insert(0, pName);
+                    curParentId = pData.TryGetProperty("id", out var pidEl) ? pidEl.GetString() ?? "" : "";
+                    if (string.IsNullOrEmpty(curParentId)) break;
+                }
+                else break;
+            }
+
+            parentNames.Add(name);
+            var fullPath = string.Join(" / ", parentNames);
+            return (name, fullPath, webUrl);
+        }
+        catch
+        {
+            return ("", "", "");
+        }
+    }
+
+    /// <summary>
     /// Tạo mới một Quy trình phê duyệt (Approval Workflow) trên dự án ACC.
     /// </summary>
     public async Task<string> CreateApprovalWorkflowAsync(
