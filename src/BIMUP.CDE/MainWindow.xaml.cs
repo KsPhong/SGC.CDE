@@ -1123,6 +1123,17 @@ public partial class MainWindow : FluentWindow
             var workflows = await _api.GetApprovalWorkflowsAsync(projectId, ct);
             var reviews = await _api.GetProjectReviewsAsync(projectId, workflows, ct);
 
+            // Nạp thông tin thư mục đích cho các workflow
+            foreach (var wf in workflows)
+            {
+                if (wf.CopyFilesEnabled && !string.IsNullOrEmpty(wf.CopyTargetFolderUrn))
+                {
+                    var (fName, fPath, fWebUrl) = await _api.GetFolderMetadataAsync(projectId, wf.CopyTargetFolderUrn, ct);
+                    wf.CopyTargetFolderPath = !string.IsNullOrEmpty(fPath) ? fPath : fName;
+                    wf.CopyTargetFolderWebUrl = fWebUrl;
+                }
+            }
+
             await Dispatcher.InvokeAsync(() =>
             {
                 _allWorkflows.Clear();
@@ -1626,6 +1637,34 @@ public partial class MainWindow : FluentWindow
 
         TxtSelectedWorkflowTitle.Text = $"LUỒNG CÁC BƯỚC: {wf.Name.ToUpper()}  ({wf.StepCount} BƯỚC)";
         RenderWorkflowNodes(wf);
+
+        // Nạp đường dẫn thư mục đích nếu chưa có
+        if (wf.CopyFilesEnabled && !string.IsNullOrEmpty(wf.CopyTargetFolderUrn) && string.IsNullOrEmpty(wf.CopyTargetFolderPath))
+        {
+            if (CboProjects.SelectedItem is AccProject curProj)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var (fName, fPath, fWebUrl) = await _api.GetFolderMetadataAsync(curProj.Id, wf.CopyTargetFolderUrn);
+                        wf.CopyTargetFolderPath = !string.IsNullOrEmpty(fPath) ? fPath : fName;
+                        wf.CopyTargetFolderWebUrl = fWebUrl;
+                        await Dispatcher.InvokeAsync(() =>
+                        {
+                            if (ReferenceEquals(GridWorkflows.SelectedItem, wf))
+                            {
+                                RenderWorkflowNodes(wf);
+                            }
+                        });
+                    }
+                    catch
+                    {
+                        // Ignore
+                    }
+                });
+            }
+        }
     }
 
     private void RenderWorkflowNodes(AccWorkflow wf)
@@ -1807,13 +1846,13 @@ public partial class MainWindow : FluentWindow
     {
         var border = new Border
         {
-            Width = 280,
-            MinHeight = 110,
+            Width = 340,
+            MinHeight = 130,
             Background = new SolidColorBrush(Color.FromArgb(20, 16, 185, 129)),
             BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#10B981")),
             BorderThickness = new Thickness(1.5),
             CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(10, 8, 10, 8),
+            Padding = new Thickness(12, 10, 12, 10),
             Margin = new Thickness(0, 2, 0, 2)
         };
 
@@ -1828,7 +1867,7 @@ public partial class MainWindow : FluentWindow
         };
         badgeBorder.Child = new WpfTextBlock
         {
-            Text = "HÀNH ĐỘNG SAU DUYỆT (ACTION)",
+            Text = "HÀNH ĐỘNG SAU DUYỆT (POST-REVIEW ACTION)",
             FontSize = 9.5,
             FontWeight = FontWeights.Bold,
             Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#10B981"))
@@ -1836,42 +1875,73 @@ public partial class MainWindow : FluentWindow
         headerDock.Children.Add(badgeBorder);
         stack.Children.Add(headerDock);
 
+        // Luồng hành động rõ ràng: Từ nguồn -> Đích
+        string sourceLabel = wf.Name.Contains("5001") || wf.Name.Contains("5101")
+            ? "10. Trình Nộp"
+            : "15. Chia Sẻ (Shared)";
+        string targetLabel = wf.Name.Contains("5001") || wf.Name.Contains("5101")
+            ? "15. Chia Sẻ (Shared)"
+            : "20. Phát Hành (Published)";
+
         stack.Children.Add(new WpfTextBlock
         {
-            Text = "📁 Tự động sao chép file",
+            Text = $"📁 Tự động sao chép: {sourceLabel} ➔ {targetLabel}",
             FontWeight = FontWeights.Bold,
             FontSize = 12,
             Foreground = (Brush)FindResource("BIMUP.Fluent.Brush.Fg1"),
-            Margin = new Thickness(0, 0, 0, 4)
+            Margin = new Thickness(0, 0, 0, 6)
         });
 
-        // Hiển thị đường dẫn thư mục đích rõ ràng
+        // Hộp chứa đường dẫn thư mục đích nổi bật
+        var folderBox = new Border
+        {
+            Background = (Brush)FindResource("BIMUP.Fluent.Brush.CardBg"),
+            BorderBrush = (Brush)FindResource("BIMUP.Fluent.Brush.Stroke1"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(8, 6, 8, 6),
+            Margin = new Thickness(0, 0, 0, 6)
+        };
+
+        var folderStack = new StackPanel();
+        folderStack.Children.Add(new WpfTextBlock
+        {
+            Text = "📂 ĐÍCH PHÁT HÀNH / LƯU TRỮ:",
+            FontSize = 9.5,
+            FontWeight = FontWeights.Bold,
+            Foreground = (Brush)FindResource("BIMUP.Fluent.Brush.Fg2"),
+            Margin = new Thickness(0, 0, 0, 2)
+        });
+
         var displayPath = !string.IsNullOrEmpty(wf.CopyTargetFolderPath)
             ? wf.CopyTargetFolderPath
-            : (!string.IsNullOrEmpty(wf.CopyTargetFolderUrn) ? wf.CopyTargetFolderUrn : "Thư mục cấu hình");
+            : (string.IsNullOrEmpty(wf.CopyTargetFolderUrn) ? "Chưa cấu hình" : "Đang nạp đường dẫn...");
 
-        stack.Children.Add(new WpfTextBlock
+        folderStack.Children.Add(new WpfTextBlock
         {
-            Text = $"Đích: {displayPath}",
+            Text = displayPath,
             FontSize = 11,
             FontWeight = FontWeights.SemiBold,
-            Foreground = (Brush)FindResource("BIMUP.Fluent.Brush.Fg1"),
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 4)
+            Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#10B981")),
+            TextWrapping = TextWrapping.Wrap
         });
 
-        // Nếu có Web Link ACC thì thêm nút bấm mở trực tiếp trên trình duyệt
+        folderBox.Child = folderStack;
+        stack.Children.Add(folderBox);
+
+        // Nút mở web ACC
         if (!string.IsNullOrEmpty(wf.CopyTargetFolderWebUrl))
         {
             var btnOpenAccFolder = new WpfButton
             {
-                Content = "🔗 Mở thư mục trên ACC",
+                Content = "🔗 Mở thư mục trên Autodesk ACC",
                 Style = (Style)FindResource("Btn.Subtle"),
-                FontSize = 10,
-                Height = 22,
-                Padding = new Thickness(4, 0, 4, 0),
+                FontSize = 10.5,
+                FontWeight = FontWeights.SemiBold,
+                Height = 24,
+                Padding = new Thickness(6, 0, 6, 0),
                 HorizontalAlignment = HorizontalAlignment.Left,
-                ToolTip = wf.CopyTargetFolderWebUrl
+                ToolTip = $"Mở đường link trên ACC:\n{wf.CopyTargetFolderWebUrl}"
             };
             btnOpenAccFolder.Click += (s, e) =>
             {
