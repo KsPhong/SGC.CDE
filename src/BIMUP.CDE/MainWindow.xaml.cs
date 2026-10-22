@@ -1888,7 +1888,7 @@ public partial class MainWindow : FluentWindow
             Height = 360,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Owner = this,
-            Background = (Brush)FindResource("BIMUP.Fluent.Brush.WindowBg"),
+            Background = (Brush)FindResource("BIMUP.Fluent.Brush.MicaWindow"),
             Foreground = (Brush)FindResource("BIMUP.Fluent.Brush.Fg1"),
             ResizeMode = ResizeMode.NoResize
         };
