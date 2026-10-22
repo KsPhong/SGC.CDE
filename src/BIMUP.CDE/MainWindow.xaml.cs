@@ -58,6 +58,7 @@ public partial class MainWindow : FluentWindow
     // Trạng thái nạp lười (Lazy loading) theo từng Tab cho dự án hiện hành
     private string? _loadedGovernanceProjectId;
     private string? _loadedWorkflowsProjectId;
+    private string? _loadedReviewsProjectId;
     private string? _loadedIssuesProjectId;
 
     public MainWindow()
@@ -634,7 +635,11 @@ public partial class MainWindow : FluentWindow
                 {
                     await LoadWorkflowsTabAsync(proj.Id);
                 }
-                else if (idx == 3 && _loadedIssuesProjectId != proj.Id)
+                else if (idx == 3 && _loadedReviewsProjectId != proj.Id)
+                {
+                    await LoadReviewsTabAsync(proj.Id);
+                }
+                else if (idx == 4 && _loadedIssuesProjectId != proj.Id)
                 {
                     await LoadIssuesTabAsync(proj.Id);
                 }
@@ -718,23 +723,45 @@ public partial class MainWindow : FluentWindow
     {
         try
         {
-            SetBusy(true, "Đang tải Quy trình phê duyệt & Đợt trình duyệt (Reviews)...");
+            SetBusy(true, "Đang tải Danh sách Quy trình phê duyệt (Workflows)...");
             _loadedWorkflowsProjectId = projectId;
 
             var workflows = await _api.GetApprovalWorkflowsAsync(projectId);
-            var reviews = await _api.GetProjectReviewsAsync(projectId, workflows);
 
             _allWorkflows.Clear();
             _allWorkflows.AddRange(workflows);
-            _allReviews.Clear();
-            _allReviews.AddRange(reviews);
             ApplyWorkflowFilter();
 
-            AppendLog($"✅ Đã tải {workflows.Count} Workflows & {reviews.Count} Reviews.");
+            AppendLog($"✅ Đã tải {workflows.Count} Quy trình phê duyệt (Workflows).");
         }
         catch (Exception ex)
         {
-            AppendLog($"⚠️ Lỗi tải Workflows / Reviews: {ex.Message}");
+            AppendLog($"⚠️ Lỗi tải Workflows: {ex.Message}");
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    private async Task LoadReviewsTabAsync(string projectId)
+    {
+        try
+        {
+            SetBusy(true, "Đang tải Danh sách Đợt trình duyệt (Reviews)...");
+            _loadedReviewsProjectId = projectId;
+
+            var reviews = await _api.GetProjectReviewsAsync(projectId, _allWorkflows);
+
+            _allReviews.Clear();
+            _allReviews.AddRange(reviews);
+            ApplyReviewFilter();
+
+            AppendLog($"✅ Đã tải {reviews.Count} Đợt trình duyệt (Reviews).");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"⚠️ Lỗi tải Reviews: {ex.Message}");
         }
         finally
         {
@@ -933,6 +960,7 @@ public partial class MainWindow : FluentWindow
             // Đặt lại cờ nạp của các tab để khi người dùng chuyển sang tab nào mới tải tab đó
             _loadedGovernanceProjectId = null;
             _loadedWorkflowsProjectId = null;
+            _loadedReviewsProjectId = null;
             _loadedIssuesProjectId = null;
 
             // Xóa dữ liệu cũ của dự án trước
@@ -1091,6 +1119,7 @@ public partial class MainWindow : FluentWindow
                 _allReviews.Clear();
                 _allReviews.AddRange(reviews);
                 ApplyWorkflowFilter();
+                ApplyReviewFilter();
             });
             AppendLog($"✅ Đã tải {workflows.Count} Quy trình phê duyệt (Workflows) và {reviews.Count} Đợt trình duyệt hồ sơ (Reviews).");
         }
@@ -1227,7 +1256,6 @@ public partial class MainWindow : FluentWindow
         var kw = TxtWorkflowSearch?.Text.Trim() ?? "";
 
         IEnumerable<AccWorkflow> wfQuery = _allWorkflows;
-        IEnumerable<AccReview> revQuery = _allReviews;
 
         if (!string.IsNullOrEmpty(kw))
         {
@@ -1236,7 +1264,29 @@ public partial class MainWindow : FluentWindow
                 w.Description.Contains(kw, StringComparison.OrdinalIgnoreCase) ||
                 w.StepsSummary.Contains(kw, StringComparison.OrdinalIgnoreCase) ||
                 w.CandidatesSummary.Contains(kw, StringComparison.OrdinalIgnoreCase));
+        }
 
+        _filteredWorkflows.Clear();
+        foreach (var w in wfQuery) _filteredWorkflows.Add(w);
+
+        if (TxtWorkflowSummary != null)
+            TxtWorkflowSummary.Text = $"{_filteredWorkflows.Count} Quy trình phê duyệt";
+    }
+
+    private void TxtReviewSearch_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (!_isUiReady) return;
+        ApplyReviewFilter();
+    }
+
+    private void ApplyReviewFilter()
+    {
+        var kw = TxtReviewSearch?.Text.Trim() ?? "";
+
+        IEnumerable<AccReview> revQuery = _allReviews;
+
+        if (!string.IsNullOrEmpty(kw))
+        {
             revQuery = revQuery.Where(r =>
                 r.Name.Contains(kw, StringComparison.OrdinalIgnoreCase) ||
                 r.WorkflowName.Contains(kw, StringComparison.OrdinalIgnoreCase) ||
@@ -1246,14 +1296,11 @@ public partial class MainWindow : FluentWindow
                 r.CreatedBy.Contains(kw, StringComparison.OrdinalIgnoreCase));
         }
 
-        _filteredWorkflows.Clear();
-        foreach (var w in wfQuery) _filteredWorkflows.Add(w);
-
         _filteredReviews.Clear();
         foreach (var r in revQuery) _filteredReviews.Add(r);
 
-        if (TxtWorkflowReviewSummary != null)
-            TxtWorkflowReviewSummary.Text = $"{_filteredWorkflows.Count} Quy trình phê duyệt  ·  {_filteredReviews.Count} Đợt trình duyệt (Reviews)";
+        if (TxtReviewSummary != null)
+            TxtReviewSummary.Text = $"{_filteredReviews.Count} Đợt trình duyệt (Reviews)";
     }
 
     private async void CboTopFolders_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1512,20 +1559,38 @@ public partial class MainWindow : FluentWindow
         }
     }
 
-    private void BtnExportWorkflowsReviewsCsv_Click(object sender, RoutedEventArgs e)
+    private void BtnExportWorkflowsCsv_Click(object sender, RoutedEventArgs e)
     {
         var projName = CleanFileName((CboProjects.SelectedItem as AccProject)?.Name ?? "ACC_Project");
         var dlg = new SaveFileDialog
         {
-            Title = "Lưu báo cáo Quy trình phê duyệt (Workflows) & Đợt trình duyệt (Reviews)",
+            Title = "Lưu danh sách Cài đặt Quy trình phê duyệt (Workflows)",
             Filter = "Excel CSV UTF-8 (*.csv)|*.csv",
-            FileName = $"SGC_CDE_Workflows_Reviews_{projName}_{DateTime.Now:yyyyMMdd_HHmm}.csv"
+            FileName = $"SGC_CDE_Workflows_{projName}_{DateTime.Now:yyyyMMdd_HHmm}.csv"
         };
 
         if (dlg.ShowDialog() == true)
         {
-            AccApiClient.ExportWorkflowsAndReviewsToCsv(_filteredWorkflows, _filteredReviews, dlg.FileName);
-            AppendLog($"✅ Đã xuất báo cáo Quy trình & Reviews ra: {dlg.FileName}");
+            AccApiClient.ExportWorkflowsAndReviewsToCsv(_filteredWorkflows, new List<AccReview>(), dlg.FileName);
+            AppendLog($"✅ Đã xuất danh sách Quy trình ra: {dlg.FileName}");
+            Process.Start(new ProcessStartInfo(dlg.FileName) { UseShellExecute = true });
+        }
+    }
+
+    private void BtnExportReviewsCsv_Click(object sender, RoutedEventArgs e)
+    {
+        var projName = CleanFileName((CboProjects.SelectedItem as AccProject)?.Name ?? "ACC_Project");
+        var dlg = new SaveFileDialog
+        {
+            Title = "Lưu danh sách Đợt trình duyệt (Reviews)",
+            Filter = "Excel CSV UTF-8 (*.csv)|*.csv",
+            FileName = $"SGC_CDE_Reviews_{projName}_{DateTime.Now:yyyyMMdd_HHmm}.csv"
+        };
+
+        if (dlg.ShowDialog() == true)
+        {
+            AccApiClient.ExportWorkflowsAndReviewsToCsv(new List<AccWorkflow>(), _filteredReviews, dlg.FileName);
+            AppendLog($"✅ Đã xuất danh sách Đợt duyệt (Reviews) ra: {dlg.FileName}");
             Process.Start(new ProcessStartInfo(dlg.FileName) { UseShellExecute = true });
         }
     }
