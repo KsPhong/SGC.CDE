@@ -36,6 +36,12 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
+[InstallDelete]
+; Xoá sạch thư mục cài đặt cũ trước khi copy bản mới, tránh để lẫn file rác từ các lần publish trước
+; (ví dụ: từng publish self-contained rồi sau đổi sang framework-dependent, hoặc ngược lại,
+; khiến hostfxr.dll/coreclr.dll cũ còn sót lại làm Windows dùng nhầm host .NET cũ và báo đòi cập nhật .NET).
+Type: filesandordirs; Name: "{app}"
+
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 

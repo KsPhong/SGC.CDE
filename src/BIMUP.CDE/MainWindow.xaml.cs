@@ -596,7 +596,9 @@ public partial class MainWindow : FluentWindow
     private void AppendLog(string message)
     {
         var line = $"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}";
-        Dispatcher.Invoke(() =>
+        // BeginInvoke (không chặn luồng gọi) thay cho Invoke đồng bộ: AppendLog được gọi rất thường xuyên
+        // (mỗi request mạng, mỗi bước quét cây thư mục) nên dùng Invoke chặn sẽ làm nghẽn UI thread.
+        Dispatcher.BeginInvoke(() =>
         {
             TxtLogs.AppendText(line);
             TxtLogs.ScrollToEnd();
@@ -624,26 +626,34 @@ public partial class MainWindow : FluentWindow
             if (NavList.SelectedItem is ListBoxItem item && item.Tag is string title)
                 TxtPageTitle.Text = title;
 
-            // Kích hoạt nạp lười (Lazy Load) theo Tab nếu dự án đã được chọn
-            if (CboHubs.SelectedItem is AccHub hub && CboProjects.SelectedItem is AccProject proj)
-            {
-                if (idx == 1 && _loadedGovernanceProjectId != proj.Id)
-                {
-                    await LoadGovernanceTabAsync(hub.Id, proj.Id);
-                }
-                else if (idx == 2 && _loadedWorkflowsProjectId != proj.Id)
-                {
-                    await LoadWorkflowsTabAsync(proj.Id);
-                }
-                else if (idx == 3 && _loadedReviewsProjectId != proj.Id)
-                {
-                    await LoadReviewsTabAsync(proj.Id);
-                }
-                else if (idx == 4 && _loadedIssuesProjectId != proj.Id)
-                {
-                    await LoadIssuesTabAsync(proj.Id);
-                }
-            }
+            await EnsureTabLoadedAsync(idx);
+        }
+    }
+
+    /// <summary>
+    /// Kích hoạt nạp lười (Lazy Load) dữ liệu cho Tab đang hiển thị, nếu dự án hiện hành chưa được tải cho Tab đó.
+    /// Dùng chung cho cả khi chuyển Tab (NavList) và khi đổi Dự án đang đứng ở một Tab khác Tab 0,
+    /// để đảm bảo mọi Tab luôn đồng bộ với dự án đang chọn.
+    /// </summary>
+    private async Task EnsureTabLoadedAsync(int idx)
+    {
+        if (CboHubs.SelectedItem is not AccHub hub || CboProjects.SelectedItem is not AccProject proj) return;
+
+        if (idx == 1 && _loadedGovernanceProjectId != proj.Id)
+        {
+            await LoadGovernanceTabAsync(hub.Id, proj.Id);
+        }
+        else if (idx == 2 && _loadedWorkflowsProjectId != proj.Id)
+        {
+            await LoadWorkflowsTabAsync(proj.Id);
+        }
+        else if (idx == 3 && _loadedReviewsProjectId != proj.Id)
+        {
+            await LoadReviewsTabAsync(proj.Id);
+        }
+        else if (idx == 4 && _loadedIssuesProjectId != proj.Id)
+        {
+            await LoadIssuesTabAsync(proj.Id);
         }
     }
 
@@ -654,10 +664,17 @@ public partial class MainWindow : FluentWindow
             SetBusy(true, "Đang tải Roles, Thành viên và Phân quyền thư mục...");
             _loadedGovernanceProjectId = projectId;
 
+            // Khởi động song song 4 lệnh gọi mạng độc lập (Roles, Project Members, Account Users, Companies)
+            // thay vì tuần tự Roles -> Members -> AccountUsers -> Companies.
+            var rolesTask = _api.GetProjectRolesAsync(hubId, projectId);
+            var projMembersTask = _api.GetProjectMembersAsync(projectId);
+            var accUsersTask = _api.GetAccountUsersAsync(hubId);
+            var companiesTask = _api.GetAccountCompaniesAsync(hubId);
+
             // 1. Roles
             try
             {
-                var roles = await _api.GetProjectRolesAsync(hubId, projectId);
+                var roles = await rolesTask;
                 _allRoles.Clear();
                 _allRoles.AddRange(roles);
                 AppendLog($"🎖️ Đã tải {roles.Count} Roles của dự án.");
@@ -667,9 +684,10 @@ public partial class MainWindow : FluentWindow
             // 2. Members & Companies
             try
             {
-                var projMembers = await _api.GetProjectMembersAsync(projectId);
-                var accUsers = await _api.GetAccountUsersAsync(hubId);
-                var companies = await _api.GetAccountCompaniesAsync(hubId);
+                await Task.WhenAll(projMembersTask, accUsersTask, companiesTask);
+                var projMembers = projMembersTask.Result;
+                var accUsers = accUsersTask.Result;
+                var companies = companiesTask.Result;
 
                 var projEmails = new HashSet<string>(
                     projMembers.Where(m => !string.IsNullOrEmpty(m.Email)).Select(m => m.Email),
@@ -687,7 +705,7 @@ public partial class MainWindow : FluentWindow
             }
             catch (Exception ex) { AppendLog($"⚠️ Lỗi tải Thành viên: {ex.Message}"); }
 
-            // 3. Phân quyền thư mục cấp 1
+            // 3. Phân quyền thư mục cấp 1 (chạy song song, giới hạn luồng bằng SemaphoreSlim)
             try
             {
                 var targetFolders = new List<AccFolder>();
@@ -698,12 +716,7 @@ public partial class MainWindow : FluentWindow
                         targetFolders.Add(sub);
                 }
 
-                var perms = new List<AccPermission>();
-                foreach (var tf in targetFolders)
-                {
-                    var fp = await _api.GetFolderPermissionsAsync(projectId, tf);
-                    perms.AddRange(fp);
-                }
+                var perms = await _api.GetFolderPermissionsBatchAsync(projectId, targetFolders);
 
                 _allPermissions.Clear();
                 _allPermissions.AddRange(perms);
@@ -728,16 +741,14 @@ public partial class MainWindow : FluentWindow
 
             var workflows = await _api.GetApprovalWorkflowsAsync(projectId);
 
-            // Truy vấn đường dẫn thư mục và link ACC cho các workflow có cài đặt copy file
-            foreach (var wf in workflows)
-            {
-                if (wf.CopyFilesEnabled && !string.IsNullOrEmpty(wf.CopyTargetFolderUrn))
-                {
-                    var (fName, fPath, fWebUrl) = await _api.GetFolderMetadataAsync(projectId, wf.CopyTargetFolderUrn);
-                    wf.CopyTargetFolderPath = !string.IsNullOrEmpty(fPath) ? fPath : fName;
-                    wf.CopyTargetFolderWebUrl = fWebUrl;
-                }
-            }
+            // Đồng bộ cây thư mục đã quét/mở ở Tab 0 vào cache đường dẫn của AccApiClient trước khi nạp,
+            // để tránh phải đệ quy gọi /parent cho các thư mục đích đã biết đường dẫn.
+            _api.SeedFolderPathCache(projectId, _allFolders);
+            _api.SeedFolderPathCache(projectId, _treeRoots);
+
+            // Truy vấn song song đường dẫn thư mục và link ACC cho các workflow có cài đặt copy file
+            // (trước đây gọi tuần tự từng workflow, có thể tới 40-50 workflow x 10 request = rất chậm).
+            await _api.ResolveWorkflowFolderMetadataAsync(projectId, workflows);
 
             _allWorkflows.Clear();
             _allWorkflows.AddRange(workflows);
@@ -761,6 +772,13 @@ public partial class MainWindow : FluentWindow
         {
             SetBusy(true, "Đang tải Danh sách Đợt trình duyệt (Reviews)...");
             _loadedReviewsProjectId = projectId;
+
+            // Nếu Tab Workflows chưa được tải cho dự án này thì _allWorkflows đang rỗng, khiến tên quy trình
+            // và bước duyệt trong Reviews bị hiển thị thành GUID thô. Đảm bảo Workflows luôn được nạp trước.
+            if (_loadedWorkflowsProjectId != projectId)
+            {
+                await LoadWorkflowsTabAsync(projectId);
+            }
 
             var reviews = await _api.GetProjectReviewsAsync(projectId, _allWorkflows);
 
@@ -787,8 +805,12 @@ public partial class MainWindow : FluentWindow
             SetBusy(true, "Đang tải Issues & Gói phát hành (Transmittals)...");
             _loadedIssuesProjectId = projectId;
 
-            var transmittals = await _api.GetProjectTransmittalsAsync(projectId);
-            var (issues, issueNote) = await _api.GetProjectIssuesAsync(projectId);
+            // Transmittals và Issues là 2 API độc lập, chạy song song thay vì tuần tự.
+            var transmittalsTask = _api.GetProjectTransmittalsAsync(projectId);
+            var issuesTask = _api.GetProjectIssuesAsync(projectId);
+            await Task.WhenAll(transmittalsTask, issuesTask);
+            var transmittals = transmittalsTask.Result;
+            var (issues, issueNote) = issuesTask.Result;
 
             _transmittals.Clear();
             foreach (var t in transmittals)
@@ -1005,6 +1027,10 @@ public partial class MainWindow : FluentWindow
 
             CboTopFolders.SelectedIndex = folders.Count > 0 ? 0 : -1;
             AppendLog($"Dự án '{proj.Name}': Đã tải xong {folders.Count} thư mục gốc (Top Folders).");
+
+            // Nếu người dùng đang đứng ở Tab khác (Thành viên/Workflows/Reviews/Issues) khi đổi dự án,
+            // tự động tải lại ngay Tab đó cho dự án mới thay vì chỉ xóa dữ liệu cũ và chờ người dùng bấm lại.
+            await EnsureTabLoadedAsync(NavList.SelectedIndex);
         }
         catch (Exception ex)
         {
@@ -1035,10 +1061,17 @@ public partial class MainWindow : FluentWindow
     /// </summary>
     private async Task LoadProjectGovernanceAsync(string hubId, string projectId, CancellationToken ct = default)
     {
+        // Khởi động song song 4 lệnh gọi mạng độc lập (Roles, Project Members, Account Users, Companies)
+        // thay vì tuần tự Roles -> Members -> AccountUsers -> Companies.
+        var rolesTask = _api.GetProjectRolesAsync(hubId, projectId, ct);
+        var projMembersTask = _api.GetProjectMembersAsync(projectId, ct);
+        var accUsersTask = _api.GetAccountUsersAsync(hubId, ct);
+        var companiesTask = _api.GetAccountCompaniesAsync(hubId, ct);
+
         // 1. Roles
         try
         {
-            var roles = await _api.GetProjectRolesAsync(hubId, projectId, ct);
+            var roles = await rolesTask;
             await Dispatcher.InvokeAsync(() =>
             {
                 _allRoles.Clear();
@@ -1054,9 +1087,10 @@ public partial class MainWindow : FluentWindow
         // 2. Project Members + Account Directory Users + Companies
         try
         {
-            var projMembers = await _api.GetProjectMembersAsync(projectId, ct);
-            var accUsers = await _api.GetAccountUsersAsync(hubId, ct);
-            var companies = await _api.GetAccountCompaniesAsync(hubId, ct);
+            await Task.WhenAll(projMembersTask, accUsersTask, companiesTask);
+            var projMembers = projMembersTask.Result;
+            var accUsers = accUsersTask.Result;
+            var companies = companiesTask.Result;
 
             var projEmails = new HashSet<string>(
                 projMembers.Where(m => !string.IsNullOrEmpty(m.Email)).Select(m => m.Email),
@@ -1080,7 +1114,7 @@ public partial class MainWindow : FluentWindow
             AppendLog($"⚠️ Không lấy được danh sách Thành viên: {ex.Message}");
         }
 
-        // 3. Phân quyền thư mục gốc & cấp 1
+        // 3. Phân quyền thư mục gốc & cấp 1 (chạy song song, giới hạn luồng bằng SemaphoreSlim)
         try
         {
             List<AccFolder> targetFolders = new();
@@ -1097,12 +1131,7 @@ public partial class MainWindow : FluentWindow
                 }
             });
 
-            var perms = new List<AccPermission>();
-            foreach (var tf in targetFolders)
-            {
-                var fp = await _api.GetFolderPermissionsAsync(projectId, tf, ct);
-                perms.AddRange(fp);
-            }
+            var perms = await _api.GetFolderPermissionsBatchAsync(projectId, targetFolders, ct);
 
             await Dispatcher.InvokeAsync(() =>
             {
@@ -1111,6 +1140,9 @@ public partial class MainWindow : FluentWindow
                 ApplyGovernanceFilter();
             });
             AppendLog($"🔐 Đã tải {perms.Count} bản ghi Phân quyền thư mục (Folder Permissions).");
+
+            // Đánh dấu Tab Thành viên & Role (Governance) đã tải xong cho dự án này.
+            _loadedGovernanceProjectId = projectId;
         }
         catch (Exception ex)
         {
@@ -1123,16 +1155,11 @@ public partial class MainWindow : FluentWindow
             var workflows = await _api.GetApprovalWorkflowsAsync(projectId, ct);
             var reviews = await _api.GetProjectReviewsAsync(projectId, workflows, ct);
 
-            // Nạp thông tin thư mục đích cho các workflow
-            foreach (var wf in workflows)
-            {
-                if (wf.CopyFilesEnabled && !string.IsNullOrEmpty(wf.CopyTargetFolderUrn))
-                {
-                    var (fName, fPath, fWebUrl) = await _api.GetFolderMetadataAsync(projectId, wf.CopyTargetFolderUrn, ct);
-                    wf.CopyTargetFolderPath = !string.IsNullOrEmpty(fPath) ? fPath : fName;
-                    wf.CopyTargetFolderWebUrl = fWebUrl;
-                }
-            }
+            // Đồng bộ cây thư mục đã quét/mở ở Tab 0 vào cache đường dẫn của AccApiClient,
+            // rồi nạp song song thông tin thư mục đích cho tất cả workflow (thay vì tuần tự từng workflow).
+            _api.SeedFolderPathCache(projectId, _allFolders);
+            _api.SeedFolderPathCache(projectId, _treeRoots);
+            await _api.ResolveWorkflowFolderMetadataAsync(projectId, workflows, ct);
 
             await Dispatcher.InvokeAsync(() =>
             {
@@ -1144,17 +1171,24 @@ public partial class MainWindow : FluentWindow
                 ApplyReviewFilter();
             });
             AppendLog($"✅ Đã tải {workflows.Count} Quy trình phê duyệt (Workflows) và {reviews.Count} Đợt trình duyệt hồ sơ (Reviews).");
+
+            // Đánh dấu Workflows & Reviews đã tải xong cho dự án này, để khi chuyển qua Tab 2/3 không bị tải lại từ đầu.
+            _loadedWorkflowsProjectId = projectId;
+            _loadedReviewsProjectId = projectId;
         }
         catch (Exception ex)
         {
             AppendLog($"⚠️ Không lấy được Quy trình / Reviews: {ex.Message}");
         }
 
-        // 5. Transmittals & Issues
+        // 5. Transmittals & Issues (2 API độc lập, chạy song song thay vì tuần tự)
         try
         {
-            var transmittals = await _api.GetProjectTransmittalsAsync(projectId, ct);
-            var (issues, issueNote) = await _api.GetProjectIssuesAsync(projectId, ct);
+            var transmittalsTask = _api.GetProjectTransmittalsAsync(projectId, ct);
+            var issuesTask = _api.GetProjectIssuesAsync(projectId, ct);
+            await Task.WhenAll(transmittalsTask, issuesTask);
+            var transmittals = transmittalsTask.Result;
+            var (issues, issueNote) = issuesTask.Result;
 
             await Dispatcher.InvokeAsync(() =>
             {
@@ -1170,6 +1204,9 @@ public partial class MainWindow : FluentWindow
                     ? $"ℹ️ {issueNote}  ·  Hồ sơ phát hành (Transmittals): {transmittals.Count}"
                     : $"Đã tải {issues.Count} Issues và {transmittals.Count} Gói phát hành (Transmittals).";
             });
+
+            // Đánh dấu Tab Issues & Phát hành đã tải xong cho dự án này.
+            _loadedIssuesProjectId = projectId;
         }
         catch (Exception ex)
         {
@@ -1190,15 +1227,17 @@ public partial class MainWindow : FluentWindow
             if (foldersToScan.Count == 0 && _treeRoots.Count > 0)
                 foldersToScan.AddRange(_treeRoots);
 
-            var allPerms = new List<AccPermission>();
-            for (int i = 0; i < foldersToScan.Count; i++)
+            // Quét song song (giới hạn luồng bằng SemaphoreSlim) thay vì tuần tự từng thư mục một.
+            var allPerms = new System.Collections.Concurrent.ConcurrentBag<AccPermission>();
+            var doneCount = 0;
+            await AccApiClient.RunWithConcurrencyAsync(foldersToScan, 6, async f =>
             {
-                _cts.Token.ThrowIfCancellationRequested();
-                var f = foldersToScan[i];
-                AppendLog($"🔐 [{i + 1}/{foldersToScan.Count}] Đang đọc phân quyền: {f.FullPath}...");
                 var fp = await _api.GetFolderPermissionsAsync(proj.Id, f, _cts.Token);
-                allPerms.AddRange(fp);
-            }
+                foreach (var p in fp)
+                    allPerms.Add(p);
+                var completed = Interlocked.Increment(ref doneCount);
+                AppendLog($"🔐 [{completed}/{foldersToScan.Count}] Đã đọc phân quyền: {f.FullPath}");
+            }, _cts.Token);
 
             _allPermissions.Clear();
             _allPermissions.AddRange(allPerms);
@@ -1355,6 +1394,10 @@ public partial class MainWindow : FluentWindow
             _allFiles.Clear();
             _allFiles.AddRange(files);
 
+            // Chia sẻ đường dẫn thư mục vừa mở ở Tab "Tài liệu & File" sang cache dùng chung của AccApiClient,
+            // để Tab Workflows/Reviews tái sử dụng được mà không phải gọi lại API đệ quy /parent.
+            _api.SeedFolderPathCache(projectId, subfolders.Append(targetFolder));
+
             TxtCurrentBreadcrumb.Text = targetFolder.FullPath;
             ApplyFilter(selectedFolderPrefix: null);
             AppendLog($"📁 '{targetFolder.FullPath}': {subfolders.Count} thư mục con, {files.Count} files.");
@@ -1407,6 +1450,11 @@ public partial class MainWindow : FluentWindow
             _isFullProjectScanned = true;
             _allFolders.AddRange(allFolders);
             _allFiles.AddRange(allFiles);
+
+            // Chia sẻ toàn bộ cây thư mục vừa quét sang cache dùng chung của AccApiClient,
+            // để Tab Workflows/Reviews nạp đường dẫn thư mục đích ngay lập tức, không cần gọi lại API.
+            _api.SeedFolderPathCache(proj.Id, allFolders);
+
             TxtCurrentBreadcrumb.Text = $"{rootFolder.FullPath} (Toàn bộ cây dự án)";
             ApplyFilter(selectedFolderPrefix: null);
             AppendLog($"✅ Hoàn tất quét dự án '{proj.Name}': Tổng cộng {_allFolders.Count} thư mục và {_allFiles.Count} files.");
@@ -2219,11 +2267,12 @@ public partial class MainWindow : FluentWindow
         try
         {
             SetBusy(true, $"Đang tải {selected.Count} files về '{baseDir}'...");
-            for (int i = 0; i < selected.Count; i++)
-            {
-                _cts.Token.ThrowIfCancellationRequested();
-                var item = selected[i];
 
+            // Lọc trước các file cần tải thật (đọc đĩa cục bộ rất nhanh, không đáng kể) để chỉ còn lại danh sách
+            // thực sự phải gọi mạng, rồi tải song song thay vì tuần tự từng file một.
+            var pending = new List<(AccFileItem Item, string LocalPath)>();
+            foreach (var item in selected)
+            {
                 var relativeFolder = item.FolderPath.Replace('/', Path.DirectorySeparatorChar);
                 foreach (var c in Path.GetInvalidPathChars())
                     relativeFolder = relativeFolder.Replace(c, '_');
@@ -2241,21 +2290,32 @@ public partial class MainWindow : FluentWindow
                     }
                 }
 
+                pending.Add((item, localPath));
+            }
+
+            // Tải song song tối đa 4 file cùng lúc (giới hạn để không nghẽn băng thông/đĩa cục bộ),
+            // thay vì tải tuần tự từng file một (rất chậm khi backup hàng trăm file).
+            var completedCount = 0;
+            await AccApiClient.RunWithConcurrencyAsync(pending, 4, async pair =>
+            {
+                var (item, localPath) = pair;
                 try
                 {
-                    item.SyncStatus = "Đang tải...";
-                    AppendLog($"⬇️ [{i + 1}/{selected.Count}] Đang tải: {item.FileName} ({item.SizeMb} MB)...");
+                    await Dispatcher.InvokeAsync(() => item.SyncStatus = "Đang tải...");
                     await _api.DownloadFileAsync(item.StorageUrn, localPath, _cts.Token);
-                    item.SyncStatus = $"✅ Đã tải (V{item.VersionNumber})";
-                    downloaded++;
+                    await Dispatcher.InvokeAsync(() => item.SyncStatus = $"✅ Đã tải (V{item.VersionNumber})");
+                    Interlocked.Increment(ref downloaded);
                 }
                 catch (Exception exFile)
                 {
-                    item.SyncStatus = "❌ Lỗi tải";
-                    failed++;
+                    await Dispatcher.InvokeAsync(() => item.SyncStatus = "❌ Lỗi tải");
+                    Interlocked.Increment(ref failed);
                     AppendLog($"⚠️ Không thể tải '{item.FileName}': {exFile.Message}");
                 }
-            }
+
+                var done = Interlocked.Increment(ref completedCount);
+                AppendLog($"⬇️ [{done}/{pending.Count}] {item.FileName} ({item.SizeMb} MB)");
+            }, _cts.Token);
 
             AppendLog($"🎉 Hoàn tất tải file! Tải mới: {downloaded}, Bỏ qua (đã mới nhất): {skipped}, Lỗi: {failed}. Thư mục: {baseDir}");
             System.Windows.MessageBox.Show(

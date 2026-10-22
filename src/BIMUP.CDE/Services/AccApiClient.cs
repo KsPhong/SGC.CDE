@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
@@ -13,7 +14,9 @@ public class AccApiClient
 {
     private const string BaseUrl = "https://developer.api.autodesk.com";
     private readonly HttpClient _http;
-    private readonly Dictionary<string, string> _projectAdminAutodeskIds = new(StringComparer.OrdinalIgnoreCase);
+    // ConcurrentDictionary: các cache này được đọc/ghi từ nhiều tác vụ chạy song song (SemaphoreSlim + Task.WhenAll),
+    // Dictionary thường không an toàn luồng (thread-safe) nên có thể gây lỗi ngẫu nhiên khi tải song song.
+    private readonly ConcurrentDictionary<string, string> _projectAdminAutodeskIds = new(StringComparer.OrdinalIgnoreCase);
     private string _clientId = "";
     private string _clientSecret = "";
     private string? _accessToken;
@@ -35,6 +38,33 @@ public class AccApiClient
     {
         if (string.IsNullOrWhiteSpace(id)) return "";
         return id.StartsWith("b.", StringComparison.OrdinalIgnoreCase) ? id.Substring(2) : id;
+    }
+
+    /// <summary>
+    /// Chạy đồng thời một tập tác vụ bất đồng bộ với giới hạn số luồng song song tối đa (SemaphoreSlim + Task.WhenAll),
+    /// thay cho việc gọi tuần tự (N+1 request) để tăng tốc tải dữ liệu từ CDE mà vẫn tránh vượt rate limit Autodesk.
+    /// </summary>
+    public static async Task RunWithConcurrencyAsync<T>(
+        IEnumerable<T> items,
+        int maxConcurrency,
+        Func<T, Task> action,
+        CancellationToken ct = default)
+    {
+        using var gate = new SemaphoreSlim(Math.Max(1, maxConcurrency));
+        var tasks = items.Select(async item =>
+        {
+            await gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                ct.ThrowIfCancellationRequested();
+                await action(item).ConfigureAwait(false);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        });
+        await Task.WhenAll(tasks).ConfigureAwait(false);
     }
 
     public async Task<string> AuthenticateTwoLeggedAsync()
@@ -121,6 +151,26 @@ public class AccApiClient
     }
 
     /// <summary>
+    /// Gửi GET có tự động thử lại khi gặp 429 (Too Many Requests). Các bước tải song song (phân quyền thư mục,
+    /// đường dẫn thư mục, versions của Reviews...) đẩy số request đồng thời lên 4-8, nên cần tự retry với backoff
+    /// để không bị rơi rớt dữ liệu (trả về rỗng âm thầm) khi Autodesk tạm thời giới hạn tốc độ.
+    /// </summary>
+    private async Task<HttpResponseMessage> SendGetWithRetryAsync(string url, string? xUserId, CancellationToken ct, int maxRetries = 3)
+    {
+        for (int attempt = 0; ; attempt++)
+        {
+            using var req = CreateGet(url, xUserId);
+            var resp = await _http.SendAsync(req, ct);
+            if ((int)resp.StatusCode != 429 || attempt >= maxRetries)
+                return resp;
+
+            var wait = resp.Headers.RetryAfter?.Delta ?? TimeSpan.FromMilliseconds(400 * Math.Pow(2, attempt));
+            resp.Dispose();
+            await Task.Delay(wait, ct);
+        }
+    }
+
+    /// <summary>
     /// Tự động lấy AutodeskId của Project Admin trong dự án để gắn vào header x-user-id khi dùng 2-Legged OAuth.
     /// </summary>
     public async Task<string?> ResolveProjectAdminAutodeskIdAsync(string projectId, CancellationToken ct = default)
@@ -131,16 +181,22 @@ public class AccApiClient
 
         try
         {
-            var members = await GetProjectMembersAsync(cleanProjId, ct);
-            var admin = members.FirstOrDefault(m =>
-                            !string.IsNullOrEmpty(m.AutodeskId) &&
-                            m.AccessLevel.Contains("Admin", StringComparison.OrdinalIgnoreCase))
-                        ?? members.FirstOrDefault(m => !string.IsNullOrEmpty(m.AutodeskId));
+            // Chỉ cần dò 1 trang đầu (tối đa 200 thành viên) trước — hầu hết dự án đã tìm được Admin ngay ở trang đầu,
+            // tránh phải tải toàn bộ danh bạ thành viên (có thể nhiều trang) chỉ để lấy 1 AutodeskId.
+            var firstPage = await GetProjectMembersAsync(cleanProjId, ct, maxPages: 1);
+            var adminId = FindAdminAutodeskId(firstPage);
 
-            if (admin != null && !string.IsNullOrEmpty(admin.AutodeskId))
+            if (string.IsNullOrEmpty(adminId))
             {
-                _projectAdminAutodeskIds[cleanProjId] = admin.AutodeskId;
-                return admin.AutodeskId;
+                // Trang đầu không có ai có AutodeskId (hiếm) -> tải đầy đủ để đảm bảo đúng.
+                var allMembers = await GetProjectMembersAsync(cleanProjId, ct);
+                adminId = FindAdminAutodeskId(allMembers);
+            }
+
+            if (!string.IsNullOrEmpty(adminId))
+            {
+                _projectAdminAutodeskIds[cleanProjId] = adminId;
+                return adminId;
             }
         }
         catch
@@ -149,6 +205,15 @@ public class AccApiClient
         }
 
         return null;
+    }
+
+    private static string? FindAdminAutodeskId(List<AccMember> members)
+    {
+        var admin = members.FirstOrDefault(m =>
+                        !string.IsNullOrEmpty(m.AutodeskId) &&
+                        m.AccessLevel.Contains("Admin", StringComparison.OrdinalIgnoreCase))
+                    ?? members.FirstOrDefault(m => !string.IsNullOrEmpty(m.AutodeskId));
+        return admin?.AutodeskId;
     }
 
     public async Task<List<AccHub>> GetHubsAsync()
@@ -292,11 +357,20 @@ public class AccApiClient
     /// <summary>
     /// Lấy danh sách Thành viên (Project Users) trong dự án từ Construction Admin v1 API.
     /// </summary>
-    public async Task<List<AccMember>> GetProjectMembersAsync(string projectId, CancellationToken ct = default)
+    public Task<List<AccMember>> GetProjectMembersAsync(string projectId, CancellationToken ct = default)
+        => GetProjectMembersAsync(projectId, ct, maxPages: null);
+
+    /// <summary>
+    /// maxPages: giới hạn số trang tải (mỗi trang tối đa 200 thành viên). Dùng null để tải toàn bộ (hiển thị ở Tab Thành viên),
+    /// hoặc giới hạn 1 trang khi chỉ cần dò nhanh 1 AutodeskId bất kỳ (ví dụ ResolveProjectAdminAutodeskIdAsync),
+    /// tránh phải tải hết danh bạ thành viên (có thể nhiều trang) chỉ để lấy 1 giá trị.
+    /// </summary>
+    private async Task<List<AccMember>> GetProjectMembersAsync(string projectId, CancellationToken ct, int? maxPages)
     {
         var cleanProjId = CleanId(projectId);
         var members = new List<AccMember>();
         string? url = $"{BaseUrl}/construction/admin/v1/projects/{Uri.EscapeDataString(cleanProjId)}/users?limit=200";
+        int pageCount = 0;
 
         while (!string.IsNullOrEmpty(url))
         {
@@ -382,8 +456,10 @@ public class AccApiClient
                 }
             }
 
+            pageCount++;
             url = null;
-            if (root.TryGetProperty("pagination", out var pag) &&
+            if ((maxPages == null || pageCount < maxPages.Value) &&
+                root.TryGetProperty("pagination", out var pag) &&
                 pag.TryGetProperty("nextUrl", out var nextEl) &&
                 nextEl.ValueKind == JsonValueKind.String)
             {
@@ -491,8 +567,7 @@ public class AccApiClient
         var cleanProjId = CleanId(projectId);
         var url = $"{BaseUrl}/bim360/docs/v1/projects/{Uri.EscapeDataString(cleanProjId)}/folders/{Uri.EscapeDataString(folder.Id)}/permissions";
 
-        using var req = CreateGet(url);
-        using var resp = await _http.SendAsync(req, ct);
+        using var resp = await SendGetWithRetryAsync(url, null, ct);
         var body = await resp.Content.ReadAsStringAsync(ct);
         if (!resp.IsSuccessStatusCode)
             return new List<AccPermission>();
@@ -537,6 +612,29 @@ public class AccApiClient
             }
         }
         return perms;
+    }
+
+    /// <summary>
+    /// Lấy song song Phân quyền (Permissions) cho một tập thư mục (thay cho gọi tuần tự từng thư mục một),
+    /// giúp tránh tắc nghẽn khi tải Phân quyền cho nhiều thư mục cùng lúc ở Tab Thành viên & Role.
+    /// </summary>
+    public async Task<List<AccPermission>> GetFolderPermissionsBatchAsync(
+        string projectId,
+        IEnumerable<AccFolder> folders,
+        CancellationToken ct = default,
+        int maxConcurrency = 6)
+    {
+        var folderList = folders.ToList();
+        var bag = new ConcurrentBag<AccPermission>();
+
+        await RunWithConcurrencyAsync(folderList, maxConcurrency, async f =>
+        {
+            var fp = await GetFolderPermissionsAsync(projectId, f, ct);
+            foreach (var p in fp)
+                bag.Add(p);
+        }, ct);
+
+        return bag.ToList();
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -722,10 +820,43 @@ public class AccApiClient
     }
 
     // Cache lưu đường dẫn thư mục để không phải gọi API nhiều lần
-    private readonly Dictionary<string, (string Name, string Path, string WebUrl)> _folderMetaCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, (string Name, string Path, string WebUrl)> _folderMetaCache = new(StringComparer.OrdinalIgnoreCase);
+    // Cache 1-hop cha-con dùng khi phải đệ quy /parent, để các thư mục khác cùng chung nhánh cha không phải gọi lại
+    private readonly ConcurrentDictionary<string, (string Name, string Id)?> _folderParentHopCache = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Nạp sẵn đường dẫn phân cấp của các thư mục đã quét/mở ở Tab "Tài liệu & File" vào cache dùng chung,
+    /// để Tab Workflows/Reviews không phải gọi lại API đệ quy /parent cho các thư mục đã biết (đồng bộ dữ liệu giữa các Tab).
+    /// </summary>
+    public void SeedFolderPathCache(string projectId, IEnumerable<AccFolder> folders)
+    {
+        var cleanProjId = CleanId(projectId);
+        foreach (var f in folders)
+        {
+            if (string.IsNullOrEmpty(f.Id) || string.IsNullOrEmpty(f.FullPath)) continue;
+            var cacheKey = $"{cleanProjId}:{f.Id}";
+            var arrowPath = ConvertSlashPathToArrowPath(f.FullPath);
+            var existingWebUrl = _folderMetaCache.TryGetValue(cacheKey, out var existing) ? existing.WebUrl : "";
+            _folderMetaCache[cacheKey] = (f.Name, arrowPath, existingWebUrl);
+        }
+    }
+
+    private static string ConvertSlashPathToArrowPath(string slashPath)
+    {
+        var parts = slashPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length > 1 &&
+            (parts[0].Equals("Project Files", StringComparison.OrdinalIgnoreCase) ||
+             parts[0].Equals("Plans", StringComparison.OrdinalIgnoreCase)))
+        {
+            parts = parts.Skip(1).ToArray();
+        }
+        return string.Join(" ➔ ", parts);
+    }
 
     /// <summary>
     /// Lấy thông tin chi tiết thư mục (tên, đường dẫn phân cấp và link xem web trên ACC).
+    /// Ưu tiên dùng đường dẫn đã biết từ cây thư mục đã quét (SeedFolderPathCache) để chỉ cần 1 request
+    /// thay vì phải đệ quy gọi /parent tới 10 lần; nếu không có sẵn, các bước cha-con vẫn được cache theo từng cặp.
     /// </summary>
     public async Task<(string FolderName, string FullPath, string WebUrl)> GetFolderMetadataAsync(
         string projectId,
@@ -735,17 +866,17 @@ public class AccApiClient
         if (string.IsNullOrWhiteSpace(folderUrn))
             return ("", "", "");
 
-        var cacheKey = $"{projectId}:{folderUrn}";
-        if (_folderMetaCache.TryGetValue(cacheKey, out var cached))
+        var cleanProjId = CleanId(projectId);
+        var cacheKey = $"{cleanProjId}:{folderUrn}";
+        if (_folderMetaCache.TryGetValue(cacheKey, out var cached) &&
+            !string.IsNullOrEmpty(cached.Path) && !string.IsNullOrEmpty(cached.WebUrl))
             return cached;
 
-        var cleanProjId = CleanId(projectId);
         var bProjId = $"b.{cleanProjId}";
         try
         {
             var url = $"{BaseUrl}/data/v1/projects/{Uri.EscapeDataString(bProjId)}/folders/{Uri.EscapeDataString(folderUrn)}";
-            using var req = CreateGet(url);
-            using var resp = await _http.SendAsync(req, ct);
+            using var resp = await SendGetWithRetryAsync(url, null, ct);
             var body = await resp.Content.ReadAsStringAsync(ct);
             if (!resp.IsSuccessStatusCode)
                 return ("", "", "");
@@ -765,32 +896,61 @@ public class AccApiClient
                 webUrl = hrefEl.GetString() ?? "";
             }
 
-            // Đệ quy lấy toàn bộ các thư mục cha lên đến Project Files
+            // Nếu đã biết đường dẫn phân cấp từ cây thư mục đã quét ở Tab "Tài liệu & File" thì dùng lại luôn,
+            // tránh phải đệ quy gọi /parent (tới 10 request tuần tự cho mỗi thư mục).
+            if (_folderMetaCache.TryGetValue(cacheKey, out var seeded) && !string.IsNullOrEmpty(seeded.Path))
+            {
+                var seededResult = (string.IsNullOrEmpty(name) ? seeded.Name : name, seeded.Path, webUrl);
+                _folderMetaCache[cacheKey] = seededResult;
+                return seededResult;
+            }
+
+            // Đệ quy lấy toàn bộ các thư mục cha lên đến Project Files, cache theo từng cặp cha-con (1 hop)
+            // để các thư mục khác cùng chung nhánh cha (thường gặp giữa các Workflow) không phải gọi lại.
             var parentNames = new List<string>();
             var curParentId = folderUrn;
             for (int depth = 0; depth < 10; depth++)
             {
+                var hopKey = $"{cleanProjId}:{curParentId}";
+                if (_folderParentHopCache.TryGetValue(hopKey, out var hop))
+                {
+                    if (hop == null) break;
+                    parentNames.Insert(0, hop.Value.Name);
+                    curParentId = hop.Value.Id;
+                    continue;
+                }
+
                 var parentUrl = $"{BaseUrl}/data/v1/projects/{Uri.EscapeDataString(bProjId)}/folders/{Uri.EscapeDataString(curParentId)}/parent";
-                using var pReq = CreateGet(parentUrl);
-                using var pResp = await _http.SendAsync(pReq, ct);
-                if (!pResp.IsSuccessStatusCode) break;
+                using var pResp = await SendGetWithRetryAsync(parentUrl, null, ct);
+                if (!pResp.IsSuccessStatusCode)
+                {
+                    _folderParentHopCache[hopKey] = null;
+                    break;
+                }
                 var pBody = await pResp.Content.ReadAsStringAsync(ct);
                 using var pDoc = JsonDocument.Parse(pBody);
-                if (pDoc.RootElement.TryGetProperty("data", out var pData))
+                if (!pDoc.RootElement.TryGetProperty("data", out var pData))
                 {
-                    var pAttrs = pData.GetProperty("attributes");
-                    var pName = pAttrs.TryGetProperty("displayName", out var pdn) && pdn.ValueKind == JsonValueKind.String
-                        ? pdn.GetString()!
-                        : (pAttrs.TryGetProperty("name", out var pn) ? pn.GetString() ?? "" : "");
-
-                    if (string.IsNullOrEmpty(pName)) break;
-                    if (pName.Equals("Project Files", StringComparison.OrdinalIgnoreCase)) break;
-
-                    parentNames.Insert(0, pName);
-                    curParentId = pData.TryGetProperty("id", out var pidEl) ? pidEl.GetString() ?? "" : "";
-                    if (string.IsNullOrEmpty(curParentId)) break;
+                    _folderParentHopCache[hopKey] = null;
+                    break;
                 }
-                else break;
+
+                var pAttrs = pData.GetProperty("attributes");
+                var pName = pAttrs.TryGetProperty("displayName", out var pdn) && pdn.ValueKind == JsonValueKind.String
+                    ? pdn.GetString()!
+                    : (pAttrs.TryGetProperty("name", out var pn) ? pn.GetString() ?? "" : "");
+                var pId = pData.TryGetProperty("id", out var pidEl) ? pidEl.GetString() ?? "" : "";
+
+                if (string.IsNullOrEmpty(pName) || pName.Equals("Project Files", StringComparison.OrdinalIgnoreCase))
+                {
+                    _folderParentHopCache[hopKey] = null;
+                    break;
+                }
+
+                _folderParentHopCache[hopKey] = (pName, pId);
+                parentNames.Insert(0, pName);
+                curParentId = pId;
+                if (string.IsNullOrEmpty(curParentId)) break;
             }
 
             parentNames.Add(name);
@@ -803,6 +963,27 @@ public class AccApiClient
         {
             return ("", "", "");
         }
+    }
+
+    /// <summary>
+    /// Nạp song song đường dẫn & link ACC của thư mục đích cho tất cả Workflow có cấu hình Copy File,
+    /// thay cho gọi tuần tự GetFolderMetadataAsync cho từng workflow (nguyên nhân chính gây lag 20-40s khi mở Tab Workflows).
+    /// </summary>
+    public async Task ResolveWorkflowFolderMetadataAsync(
+        string projectId,
+        IEnumerable<AccWorkflow> workflows,
+        CancellationToken ct = default,
+        int maxConcurrency = 8)
+    {
+        var targets = workflows.Where(w => w.CopyFilesEnabled && !string.IsNullOrEmpty(w.CopyTargetFolderUrn)).ToList();
+        if (targets.Count == 0) return;
+
+        await RunWithConcurrencyAsync(targets, maxConcurrency, async wf =>
+        {
+            var (fName, fPath, fWebUrl) = await GetFolderMetadataAsync(projectId, wf.CopyTargetFolderUrn, ct);
+            wf.CopyTargetFolderPath = !string.IsNullOrEmpty(fPath) ? fPath : fName;
+            wf.CopyTargetFolderWebUrl = fWebUrl;
+        }, ct);
     }
 
     /// <summary>
@@ -964,38 +1145,40 @@ public class AccApiClient
                     FinishedAt = finishedAt
                 };
 
-                // Lấy thêm danh sách file bên trong đợt Review này
-                try
-                {
-                    var verUrl = $"{BaseUrl}/construction/reviews/v1/projects/{Uri.EscapeDataString(cleanProjId)}/reviews/{Uri.EscapeDataString(id)}/versions?limit=50";
-                    using var verReq = CreateGet(verUrl, xUserId);
-                    using var verResp = await _http.SendAsync(verReq, ct);
-                    if (verResp.IsSuccessStatusCode)
-                    {
-                        var verBody = await verResp.Content.ReadAsStringAsync(ct);
-                        using var verDoc = JsonDocument.Parse(verBody);
-                        if (verDoc.RootElement.TryGetProperty("results", out var verArr) && verArr.ValueKind == JsonValueKind.Array)
-                        {
-                            var fileNames = new List<string>();
-                            foreach (var fv in verArr.EnumerateArray())
-                            {
-                                var fn = fv.TryGetProperty("name", out var fnEl) ? fnEl.GetString() ?? "" : "";
-                                if (!string.IsNullOrEmpty(fn))
-                                    fileNames.Add(fn);
-                            }
-                            review.FilesCount = fileNames.Count;
-                            review.FilesSummary = string.Join(" | ", fileNames);
-                        }
-                    }
-                }
-                catch
-                {
-                    // Ignore per-review version error
-                }
-
                 list.Add(review);
             }
         }
+
+        // Lấy song song danh sách file bên trong từng đợt Review (trước đây gọi tuần tự N+1 request, rất chậm)
+        await RunWithConcurrencyAsync(list, 8, async review =>
+        {
+            try
+            {
+                var verUrl = $"{BaseUrl}/construction/reviews/v1/projects/{Uri.EscapeDataString(cleanProjId)}/reviews/{Uri.EscapeDataString(review.Id)}/versions?limit=50";
+                using var verResp = await SendGetWithRetryAsync(verUrl, xUserId, ct);
+                if (verResp.IsSuccessStatusCode)
+                {
+                    var verBody = await verResp.Content.ReadAsStringAsync(ct);
+                    using var verDoc = JsonDocument.Parse(verBody);
+                    if (verDoc.RootElement.TryGetProperty("results", out var verArr) && verArr.ValueKind == JsonValueKind.Array)
+                    {
+                        var fileNames = new List<string>();
+                        foreach (var fv in verArr.EnumerateArray())
+                        {
+                            var fn = fv.TryGetProperty("name", out var fnEl) ? fnEl.GetString() ?? "" : "";
+                            if (!string.IsNullOrEmpty(fn))
+                                fileNames.Add(fn);
+                        }
+                        review.FilesCount = fileNames.Count;
+                        review.FilesSummary = string.Join(" | ", fileNames);
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore per-review version error
+            }
+        }, ct);
 
         return list;
     }
@@ -1237,7 +1420,10 @@ public class AccApiClient
         var allFolders = new List<AccFolder> { rootFolder };
         var allFiles = new List<AccFileItem>();
 
-        await CrawlTreeRecursiveInternalAsync(projectId, rootFolder, allFolders, allFiles, progress, ct);
+        // Giới hạn tối đa 6 request đọc nội dung thư mục chạy song song, thay vì quét đệ quy tuần tự từng thư mục một
+        // (tuần tự khiến cây thư mục lớn mất 20-40s; song song có kiểm soát giúp nhanh hơn nhiều mà không bị Autodesk rate-limit).
+        using var gate = new SemaphoreSlim(6);
+        await CrawlTreeRecursiveInternalAsync(projectId, rootFolder, allFolders, allFiles, progress, gate, ct);
 
         if (includeCustomAttributes && allFiles.Count > 0)
         {
@@ -1254,25 +1440,42 @@ public class AccApiClient
         List<AccFolder> allFolders,
         List<AccFileItem> allFiles,
         IProgress<string>? progress,
+        SemaphoreSlim gate,
         CancellationToken ct)
     {
-        progress?.Report($"📂 Đang đọc thư mục: {currentFolder.FullPath} ({allFolders.Count} folders, {allFiles.Count} files)...");
-        var (subfolders, files) = await GetSingleFolderContentsAsync(projectId, currentFolder, ct);
+        int folderSnapshot, fileSnapshot;
+        lock (allFolders) { folderSnapshot = allFolders.Count; }
+        lock (allFiles) { fileSnapshot = allFiles.Count; }
+        progress?.Report($"📂 Đang đọc thư mục: {currentFolder.FullPath} ({folderSnapshot} folders, {fileSnapshot} files)...");
 
-        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        await gate.WaitAsync(ct);
+        List<AccFolder> subfolders;
+        List<AccFileItem> files;
+        try
         {
-            currentFolder.Children.Clear();
-            foreach (var sf in subfolders)
-                currentFolder.Children.Add(sf);
-        });
-
-        allFolders.AddRange(subfolders);
-        allFiles.AddRange(files);
-
-        foreach (var sub in subfolders)
-        {
-            await CrawlTreeRecursiveInternalAsync(projectId, sub, allFolders, allFiles, progress, ct);
+            (subfolders, files) = await GetSingleFolderContentsAsync(projectId, currentFolder, ct);
         }
+        finally
+        {
+            gate.Release();
+        }
+
+        // Dùng InvokeAsync (không chặn luồng gọi) thay cho Invoke đồng bộ để tránh nghẽn UI thread khi quét cây lớn
+        if (System.Windows.Application.Current != null)
+        {
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                currentFolder.Children.Clear();
+                foreach (var sf in subfolders)
+                    currentFolder.Children.Add(sf);
+            });
+        }
+
+        lock (allFolders) { allFolders.AddRange(subfolders); }
+        lock (allFiles) { allFiles.AddRange(files); }
+
+        await Task.WhenAll(subfolders.Select(sub =>
+            CrawlTreeRecursiveInternalAsync(projectId, sub, allFolders, allFiles, progress, gate, ct)));
     }
 
     private static AccFileItem ParseFileItemElement(
@@ -1365,10 +1568,13 @@ public class AccApiClient
                          .ToDictionary(g => g.Key, g => g.ToList());
 
         var allUrns = byUrn.Keys.ToList();
+        var batches = new List<string[]>();
         for (int i = 0; i < allUrns.Count; i += 50)
+            batches.Add(allUrns.Skip(i).Take(50).ToArray());
+
+        // Chạy song song các batch (mỗi batch tối đa 50 URN theo giới hạn của Autodesk) thay vì tuần tự từng batch.
+        await RunWithConcurrencyAsync(batches, 4, async batch =>
         {
-            ct.ThrowIfCancellationRequested();
-            var batch = allUrns.Skip(i).Take(50).ToArray();
             var payload = JsonSerializer.Serialize(new { urns = batch });
 
             using var req = new HttpRequestMessage(HttpMethod.Post, url);
@@ -1377,12 +1583,12 @@ public class AccApiClient
 
             using var resp = await _http.SendAsync(req, ct);
             if (!resp.IsSuccessStatusCode)
-                continue;
+                return;
 
             var body = await resp.Content.ReadAsStringAsync(ct);
             using var doc = JsonDocument.Parse(body);
             if (!doc.RootElement.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array)
-                continue;
+                return;
 
             foreach (var r in results.EnumerateArray())
             {
@@ -1405,7 +1611,7 @@ public class AccApiClient
                         item.CustomAttributesSummary = summary;
                 }
             }
-        }
+        }, ct);
     }
 
     public async Task DownloadFileAsync(string storageUrn, string localFilePath, CancellationToken ct = default)
