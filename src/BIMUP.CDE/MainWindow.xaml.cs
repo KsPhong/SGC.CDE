@@ -834,7 +834,7 @@ public partial class MainWindow : FluentWindow
             NavList.SelectedIndex = 5;
             System.Windows.MessageBox.Show(
                 "Vui lòng nhập APS Client ID và APS Client Secret ở mục 'Cấu hình API' trước khi kết nối!",
-                "BIMUP.CDE — Thiếu thông tin API",
+                "SGC CDE — Thiếu thông tin API",
                 System.Windows.MessageBoxButton.OK,
                 MessageBoxImage.Information);
             return;
@@ -1442,7 +1442,7 @@ public partial class MainWindow : FluentWindow
     {
         if (_filteredFolders.Count == 0)
         {
-            System.Windows.MessageBox.Show("Chưa có dữ liệu Thư mục nào để xuất!", "BIMUP.CDE", System.Windows.MessageBoxButton.OK, MessageBoxImage.Information);
+            System.Windows.MessageBox.Show("Chưa có dữ liệu Thư mục nào để xuất!", "SGC CDE", System.Windows.MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -1451,7 +1451,7 @@ public partial class MainWindow : FluentWindow
         {
             Title = "Lưu báo cáo danh sách Thư mục Dự án (Mở bằng Excel)",
             Filter = "Excel CSV UTF-8 (*.csv)|*.csv",
-            FileName = $"BIMUP_CDE_Folders_{projName}_{DateTime.Now:yyyyMMdd_HHmm}.csv"
+            FileName = $"SGC_CDE_Folders_{projName}_{DateTime.Now:yyyyMMdd_HHmm}.csv"
         };
 
         if (dlg.ShowDialog() == true)
@@ -1466,7 +1466,7 @@ public partial class MainWindow : FluentWindow
     {
         if (_filteredFiles.Count == 0)
         {
-            System.Windows.MessageBox.Show("Chưa có dữ liệu File nào trong bảng để xuất báo cáo!", "BIMUP.CDE", System.Windows.MessageBoxButton.OK, MessageBoxImage.Information);
+            System.Windows.MessageBox.Show("Chưa có dữ liệu File nào trong bảng để xuất báo cáo!", "SGC CDE", System.Windows.MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -1475,7 +1475,7 @@ public partial class MainWindow : FluentWindow
         {
             Title = "Lưu báo cáo danh sách File ACC (Mở bằng Excel)",
             Filter = "Excel CSV UTF-8 (*.csv)|*.csv",
-            FileName = $"BIMUP_CDE_Files_{projName}_{DateTime.Now:yyyyMMdd_HHmm}.csv"
+            FileName = $"SGC_CDE_Files_{projName}_{DateTime.Now:yyyyMMdd_HHmm}.csv"
         };
 
         if (dlg.ShowDialog() == true)
@@ -1493,7 +1493,7 @@ public partial class MainWindow : FluentWindow
         {
             Title = "Lưu báo cáo Roles, Thành viên & Phân quyền Thư mục",
             Filter = "Excel CSV UTF-8 (*.csv)|*.csv",
-            FileName = $"BIMUP_CDE_Roles_Members_{projName}_{DateTime.Now:yyyyMMdd_HHmm}.csv"
+            FileName = $"SGC_CDE_Roles_Members_{projName}_{DateTime.Now:yyyyMMdd_HHmm}.csv"
         };
 
         if (dlg.ShowDialog() == true)
@@ -1511,7 +1511,7 @@ public partial class MainWindow : FluentWindow
         {
             Title = "Lưu báo cáo Quy trình phê duyệt (Workflows) & Đợt trình duyệt (Reviews)",
             Filter = "Excel CSV UTF-8 (*.csv)|*.csv",
-            FileName = $"BIMUP_CDE_Workflows_Reviews_{projName}_{DateTime.Now:yyyyMMdd_HHmm}.csv"
+            FileName = $"SGC_CDE_Workflows_Reviews_{projName}_{DateTime.Now:yyyyMMdd_HHmm}.csv"
         };
 
         if (dlg.ShowDialog() == true)

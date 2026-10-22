@@ -72,7 +72,7 @@ public sealed class CdeMcpBridge : IDisposable
             {
                 ["protocol"] = 1,
                 ["host"] = "cde",
-                ["product"] = "BIMUP CDE Studio",
+                ["product"] = "SGC CDE Studio",
                 ["year"] = 2026,
                 ["pid"] = _pid,
                 ["pipe"] = _pipeName,
@@ -220,7 +220,7 @@ public sealed class CdeMcpBridge : IDisposable
     {
         return new JsonObject
         {
-            ["product"] = "BIMUP CDE Studio",
+            ["product"] = "SGC CDE Studio",
             ["bridge_version"] = "1.0.0",
             ["toolsets"] = new JsonObject
             {
@@ -233,7 +233,7 @@ public sealed class CdeMcpBridge : IDisposable
                 {
                     ["name"] = "get_status",
                     ["toolset"] = "explorer",
-                    ["description"] = "Lấy trạng thái hiện tại của BIMUP.CDE: Hub đang chọn, Dự án đang chọn, đường dẫn thư mục, số lượng folder/file/role/member/workflow/review.",
+                    ["description"] = "Lấy trạng thái hiện tại của SGC CDE: Hub đang chọn, Dự án đang chọn, đường dẫn thư mục, số lượng folder/file/role/member/workflow/review.",
                     ["read_only"] = true,
                     ["input_schema"] = new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }
                 },
@@ -249,7 +249,7 @@ public sealed class CdeMcpBridge : IDisposable
                 {
                     ["name"] = "select_project",
                     ["toolset"] = "explorer",
-                    ["description"] = "Chọn một Dự án trên giao diện BIMUP.CDE theo tên hoặc ID và nạp cây thư mục + Roles + Members + Workflows + Reviews của dự án đó.",
+                    ["description"] = "Chọn một Dự án trên giao diện SGC CDE theo tên hoặc ID và nạp cây thư mục + Roles + Members + Workflows + Reviews của dự án đó.",
                     ["read_only"] = false,
                     ["input_schema"] = new JsonObject
                     {
@@ -265,7 +265,7 @@ public sealed class CdeMcpBridge : IDisposable
                 {
                     ["name"] = "get_folders",
                     ["toolset"] = "explorer",
-                    ["description"] = "Lấy danh sách các Thư mục (Folders) đang hiển thị trong BIMUP.CDE.",
+                    ["description"] = "Lấy danh sách các Thư mục (Folders) đang hiển thị trong SGC CDE.",
                     ["read_only"] = true,
                     ["input_schema"] = new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }
                 },
@@ -289,7 +289,7 @@ public sealed class CdeMcpBridge : IDisposable
                 {
                     ["name"] = "get_files",
                     ["toolset"] = "explorer",
-                    ["description"] = "Lấy danh sách các File (Items & Versions) đang hiển thị trong BIMUP.CDE.",
+                    ["description"] = "Lấy danh sách các File (Items & Versions) đang hiển thị trong SGC CDE.",
                     ["read_only"] = true,
                     ["input_schema"] = new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }
                 },
@@ -361,7 +361,7 @@ public sealed class CdeMcpBridge : IDisposable
                 {
                     ["name"] = "get_logs",
                     ["toolset"] = "explorer",
-                    ["description"] = "Đọc toàn bộ nội dung Nhật ký hoạt động của BIMUP.CDE.",
+                    ["description"] = "Đọc toàn bộ nội dung Nhật ký hoạt động của SGC CDE.",
                     ["read_only"] = true,
                     ["input_schema"] = new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }
                 }

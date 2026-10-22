@@ -8,7 +8,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>BIMUP.CDE</AssemblyName>
     <RootNamespace>BIMUP.CDE</RootNamespace>
-    <Product>BIMUP CDE Studio</Product>
+    <Product>SGC CDE Studio</Product>
     <ApplicationIcon>Assets\bimup.ico</ApplicationIcon>
   </PropertyGroup>
 

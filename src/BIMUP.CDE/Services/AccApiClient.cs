@@ -78,7 +78,7 @@ public class AccApiClient
         var context = await contextTask;
 
         var code = context.Request.QueryString["code"];
-        var html = "<html><head><meta charset='utf-8'/></head><body style='font-family:Segoe UI;text-align:center;padding-top:60px;'><h2>✅ Đăng nhập BIMUP.CDE thành công!</h2><p>Anh có thể đóng tab trình duyệt này và quay lại phần mềm BIMUP.CDE.</p></body></html>";
+        var html = "<html><head><meta charset='utf-8'/></head><body style='font-family:Segoe UI;text-align:center;padding-top:60px;'><h2>✅ Đăng nhập SGC CDE thành công!</h2><p>Anh có thể đóng tab trình duyệt này và quay lại phần mềm SGC CDE.</p></body></html>";
         var buffer = Encoding.UTF8.GetBytes(html);
         context.Response.ContentLength64 = buffer.Length;
         await context.Response.OutputStream.WriteAsync(buffer, ct);
