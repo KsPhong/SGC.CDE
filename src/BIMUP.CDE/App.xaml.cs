@@ -7,10 +7,14 @@ public partial class App : Application
 {
     public App()
     {
-        System.IO.File.AppendAllText(@"D:\BIMUP Addin\BIMUP.CDE\startup.log", "App ctor\n");
+        System.IO.File.AppendAllText(@"D:\BIMUP Addin\BIMUP.CDE\startup.log", $"App ctor (PID {Environment.ProcessId})\n");
         AppDomain.CurrentDomain.UnhandledException += (s, e) =>
         {
             System.IO.File.AppendAllText(@"D:\BIMUP Addin\BIMUP.CDE\startup.log", "Unhandled: " + e.ExceptionObject + "\n");
+        };
+        Exit += (s, e) =>
+        {
+            System.IO.File.AppendAllText(@"D:\BIMUP Addin\BIMUP.CDE\startup.log", $"App Exit event fired with code {e.ApplicationExitCode}, stack:\n{Environment.StackTrace}\n");
         };
     }
 

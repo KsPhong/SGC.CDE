@@ -41,9 +41,9 @@
                 <Setter Property="GridLinesVisibility" Value="Horizontal" />
                 <Setter Property="CanUserResizeColumns" Value="True" />
                 <Setter Property="CanUserSortColumns" Value="True" />
-                <Setter Property="RowHeight" Value="38" />
-                <Setter Property="ColumnHeaderHeight" Value="36" />
-                <Setter Property="FontSize" Value="13" />
+                <Setter Property="RowHeight" Value="34" />
+                <Setter Property="ColumnHeaderHeight" Value="34" />
+                <Setter Property="FontSize" Value="12.5" />
             </Style>
 
             <Style TargetType="Expander" BasedOn="{StaticResource BIMUP.Fluent.Expander}" />

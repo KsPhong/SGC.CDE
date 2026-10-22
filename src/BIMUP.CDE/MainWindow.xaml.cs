@@ -89,17 +89,14 @@ public partial class MainWindow : FluentWindow
 
         Closed += (_, _) =>
         {
-            File.AppendAllText(@"D:\BIMUP Addin\BIMUP.CDE\startup.log", "MainWindow Closed event fired\n");
+            var stack = Environment.StackTrace;
+            File.AppendAllText(@"D:\BIMUP Addin\BIMUP.CDE\startup.log", $"MainWindow Closed event fired, stack:\n{stack}\n");
             _mcpBridge.Dispose();
         };
 
-        Loaded += async (_, _) =>
+        Loaded += (_, _) =>
         {
             File.AppendAllText(@"D:\BIMUP Addin\BIMUP.CDE\startup.log", "MainWindow Loaded event fired\n");
-            if (!string.IsNullOrWhiteSpace(_config.ClientId) && !string.IsNullOrWhiteSpace(_config.ClientSecret))
-            {
-                await ConnectAccAsync();
-            }
         };
     }
 
