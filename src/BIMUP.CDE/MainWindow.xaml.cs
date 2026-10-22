@@ -1638,8 +1638,9 @@ public partial class MainWindow : FluentWindow
         TxtSelectedWorkflowTitle.Text = $"LUỒNG CÁC BƯỚC: {wf.Name.ToUpper()}  ({wf.StepCount} BƯỚC)";
         RenderWorkflowNodes(wf);
 
-        // Nạp đường dẫn thư mục đích nếu chưa có
-        if (wf.CopyFilesEnabled && !string.IsNullOrEmpty(wf.CopyTargetFolderUrn) && string.IsNullOrEmpty(wf.CopyTargetFolderPath))
+        // Nạp đường dẫn thư mục đích nếu chưa có hoặc mới chỉ có tên ngắn
+        if (wf.CopyFilesEnabled && !string.IsNullOrEmpty(wf.CopyTargetFolderUrn) &&
+            (string.IsNullOrEmpty(wf.CopyTargetFolderPath) || !wf.CopyTargetFolderPath.Contains("➔")))
         {
             if (CboProjects.SelectedItem is AccProject curProj)
             {

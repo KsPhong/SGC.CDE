@@ -721,6 +721,9 @@ public class AccApiClient
         return list.OrderBy(w => w.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
+    // Cache lưu đường dẫn thư mục để không phải gọi API nhiều lần
+    private readonly Dictionary<string, (string Name, string Path, string WebUrl)> _folderMetaCache = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Lấy thông tin chi tiết thư mục (tên, đường dẫn phân cấp và link xem web trên ACC).
     /// </summary>
@@ -729,6 +732,13 @@ public class AccApiClient
         string folderUrn,
         CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(folderUrn))
+            return ("", "", "");
+
+        var cacheKey = $"{projectId}:{folderUrn}";
+        if (_folderMetaCache.TryGetValue(cacheKey, out var cached))
+            return cached;
+
         var cleanProjId = CleanId(projectId);
         var bProjId = $"b.{cleanProjId}";
         try
@@ -755,10 +765,10 @@ public class AccApiClient
                 webUrl = hrefEl.GetString() ?? "";
             }
 
-            // Đệ quy lấy tên cha nếu có
+            // Đệ quy lấy toàn bộ các thư mục cha lên đến Project Files
             var parentNames = new List<string>();
             var curParentId = folderUrn;
-            for (int depth = 0; depth < 5; depth++)
+            for (int depth = 0; depth < 10; depth++)
             {
                 var parentUrl = $"{BaseUrl}/data/v1/projects/{Uri.EscapeDataString(bProjId)}/folders/{Uri.EscapeDataString(curParentId)}/parent";
                 using var pReq = CreateGet(parentUrl);
@@ -772,8 +782,10 @@ public class AccApiClient
                     var pName = pAttrs.TryGetProperty("displayName", out var pdn) && pdn.ValueKind == JsonValueKind.String
                         ? pdn.GetString()!
                         : (pAttrs.TryGetProperty("name", out var pn) ? pn.GetString() ?? "" : "");
-                    if (string.IsNullOrEmpty(pName) || pName.Equals("Project Files", StringComparison.OrdinalIgnoreCase))
-                        break;
+
+                    if (string.IsNullOrEmpty(pName)) break;
+                    if (pName.Equals("Project Files", StringComparison.OrdinalIgnoreCase)) break;
+
                     parentNames.Insert(0, pName);
                     curParentId = pData.TryGetProperty("id", out var pidEl) ? pidEl.GetString() ?? "" : "";
                     if (string.IsNullOrEmpty(curParentId)) break;
@@ -782,8 +794,10 @@ public class AccApiClient
             }
 
             parentNames.Add(name);
-            var fullPath = string.Join(" / ", parentNames);
-            return (name, fullPath, webUrl);
+            var fullPath = string.Join(" ➔ ", parentNames);
+            var result = (name, fullPath, webUrl);
+            _folderMetaCache[cacheKey] = result;
+            return result;
         }
         catch
         {
