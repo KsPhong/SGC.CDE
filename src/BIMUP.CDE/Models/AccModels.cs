@@ -194,6 +194,34 @@ public class AccPermission
     public string SubjectId { get; set; } = "";
 }
 
+public class AccWorkflowStepItem
+{
+    public int Order { get; set; }
+    public string StepId { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Type { get; set; } = ""; // INITIATOR, REVIEWER, APPROVER
+    public string TypeBadge => Type switch
+    {
+        "INITIATOR" => "Người Khởi Tạo",
+        "REVIEWER" => "Kiểm Tra (Reviewer)",
+        "APPROVER" => "Phê Duyệt (Approver)",
+        _ => Type
+    };
+    public string TypeColor => Type switch
+    {
+        "INITIATOR" => "#4F5BD5", // Brand Accent / Purple
+        "REVIEWER" => "#0284C7",  // Sky Blue
+        "APPROVER" => "#10B981",  // Emerald Green
+        _ => "#6B7280"
+    };
+    public int Duration { get; set; }
+    public string DueDateType { get; set; } = "CALENDAR_DAY";
+    public string DurationLabel => Duration > 0 ? $"{Duration} ngày" : "Không giới hạn";
+    public List<string> Roles { get; set; } = new();
+    public List<string> Users { get; set; } = new();
+    public string CandidatesSummary => string.Join(", ", Roles.Concat(Users));
+}
+
 public class AccWorkflow
 {
     public string Id { get; set; } = "";
@@ -205,9 +233,13 @@ public class AccWorkflow
     public string CandidatesSummary { get; set; } = "";
     public string ApprovalOptionsSummary { get; set; } = "";
     public string CopyFilesInfo { get; set; } = "";
+    public string CopyTargetFolderUrn { get; set; } = "";
+    public bool CopyFilesEnabled { get; set; }
     public string CreatedAt { get; set; } = "";
     public string UpdatedAt { get; set; } = "";
+    public string CreatedBy { get; set; } = "Hệ thống CDE";
     public Dictionary<string, string> StepNamesById { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<AccWorkflowStepItem> Steps { get; set; } = new();
 }
 
 public class AccReview

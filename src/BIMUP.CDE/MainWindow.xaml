@@ -815,9 +815,11 @@
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" MinHeight="160" />
+                                <RowDefinition Height="3*" MinHeight="140" />
                                 <RowDefinition Height="8" />
-                                <RowDefinition Height="*" MinHeight="160" />
+                                <RowDefinition Height="2*" MinHeight="140" />
+                                <RowDefinition Height="8" />
+                                <RowDefinition Height="2*" MinHeight="130" />
                             </Grid.RowDefinitions>
 
                             <Border Grid.Row="0" Background="{DynamicResource BIMUP.Fluent.Brush.CardBg}"
@@ -857,25 +859,30 @@
                                     <Border DockPanel.Dock="Top" Background="{DynamicResource BIMUP.Fluent.Brush.Layer3}"
                                             BorderBrush="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" BorderThickness="0,0,0,1"
                                             CornerRadius="7,7,0,0" Padding="12,6">
-                                        <StackPanel Orientation="Horizontal">
-                                            <ui:SymbolIcon Symbol="Flow20" FontSize="15"
-                                                           Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" Margin="0,0,6,0" />
-                                            <TextBlock Text="DANH SÁCH QUY TRÌNH PHÊ DUYỆT (APPROVAL WORKFLOWS)"
-                                                       FontSize="11.5" FontWeight="SemiBold"
-                                                       Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" VerticalAlignment="Center" />
-                                        </StackPanel>
+                                        <Grid>
+                                            <StackPanel Orientation="Horizontal">
+                                                <ui:SymbolIcon Symbol="Flow20" FontSize="15"
+                                                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" Margin="0,0,6,0" />
+                                                <TextBlock Text="DANH SÁCH QUY TRÌNH PHÊ DUYỆT (APPROVAL WORKFLOWS)"
+                                                           FontSize="11.5" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                       FontSize="11" Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg3}"
+                                                       Text="💡 Click vào một dòng quy trình để xem chi tiết luồng các bước (Node Flow)" />
+                                        </Grid>
                                     </Border>
-                                    <DataGrid x:Name="GridWorkflows" BorderThickness="0">
+                                    <DataGrid x:Name="GridWorkflows" BorderThickness="0"
+                                              SelectionMode="Single"
+                                              SelectionChanged="GridWorkflows_SelectionChanged">
                                         <DataGrid.Columns>
-                                            <DataGridTextColumn Header="TÊN QUY TRÌNH" Binding="{Binding Name}" Width="280" FontWeight="SemiBold" />
-                                            <DataGridTextColumn Header="TRẠNG THÁI" Binding="{Binding Status}" Width="90" />
-                                            <DataGridTextColumn Header="SỐ BƯỚC" Binding="{Binding StepCount}" Width="70" />
-                                            <DataGridTextColumn Header="LUỒNG CÁC BƯỚC (STEPS)" Binding="{Binding StepsSummary}" Width="320" />
-                                            <DataGridTextColumn Header="CÁC ROLE / NGƯỜI THAM GIA" Binding="{Binding CandidatesSummary}" Width="340" />
-                                            <DataGridTextColumn Header="KẾT QUẢ DUYỆT" Binding="{Binding ApprovalOptionsSummary}" Width="170" />
-                                            <DataGridTextColumn Header="TỰ ĐỘNG COPY" Binding="{Binding CopyFilesInfo}" Width="170" />
-                                            <DataGridTextColumn Header="MÔ TẢ" Binding="{Binding Description}" Width="250" />
-                                            <DataGridTextColumn Header="NGÀY TẠO" Binding="{Binding CreatedAt}" Width="120" />
+                                            <DataGridTextColumn Header="TÊN QUY TRÌNH" Binding="{Binding Name}" Width="320" FontWeight="SemiBold" />
+                                            <DataGridTextColumn Header="TRẠNG THÁI" Binding="{Binding Status}" Width="95" />
+                                            <DataGridTextColumn Header="SỐ BƯỚC" Binding="{Binding StepCount}" Width="80" />
+                                            <DataGridTextColumn Header="KẾT QUẢ DUYỆT" Binding="{Binding ApprovalOptionsSummary}" Width="190" />
+                                            <DataGridTextColumn Header="MÔ TẢ" Binding="{Binding Description}" Width="*" />
+                                            <DataGridTextColumn Header="NGÀY TẠO" Binding="{Binding CreatedAt}" Width="125" />
+                                            <DataGridTextColumn Header="NGƯỜI TẠO" Binding="{Binding CreatedBy}" Width="140" />
                                         </DataGrid.Columns>
                                     </DataGrid>
                                 </DockPanel>
@@ -883,8 +890,63 @@
 
                             <GridSplitter Grid.Row="2" Height="8" HorizontalAlignment="Stretch" Background="Transparent" />
 
-                            <!-- BẢNG REVIEWS -->
+                            <!-- ═══ CHI TIẾT CÁC BƯỚC (NODE FLOW CANVAS) ═══ -->
                             <Border Grid.Row="3" Background="{DynamicResource BIMUP.Fluent.Brush.CardBg}"
+                                    BorderBrush="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" BorderThickness="1"
+                                    CornerRadius="8" Padding="0">
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Top" Background="{DynamicResource BIMUP.Fluent.Brush.Layer3}"
+                                            BorderBrush="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" BorderThickness="0,0,0,1"
+                                            CornerRadius="7,7,0,0" Padding="12,6">
+                                        <Grid>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <ui:SymbolIcon Symbol="Diagram24" FontSize="15"
+                                                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" Margin="0,0,6,0" />
+                                                <TextBlock x:Name="TxtSelectedWorkflowTitle"
+                                                           Text="SƠ ĐỒ LUỒNG CÁC BƯỚC &amp; HÀNH ĐỘNG (NODE FLOW DIAGRAM)"
+                                                           FontSize="11.5" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                <Button x:Name="BtnCloneWorkflowToHcm" Style="{StaticResource Btn.Subtle}"
+                                                        Padding="10,0" Height="26" Margin="0,0,6,0"
+                                                        ToolTip="Sao chép chuẩn hóa quy trình này sang dự án N.DSHCMCG"
+                                                        Click="BtnCloneWorkflowToHcm_Click">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <ui:SymbolIcon Symbol="Copy24" FontSize="13" Margin="0,0,4,0" />
+                                                        <TextBlock Text="Clone sang N.DSHCMCG" FontSize="11" FontWeight="SemiBold" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button x:Name="BtnQuickExportWorkflowJson" Style="{StaticResource Btn.Subtle}"
+                                                        Padding="10,0" Height="26"
+                                                        ToolTip="Xuất file JSON cấu hình của quy trình"
+                                                        Click="BtnQuickExportWorkflowJson_Click">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <ui:SymbolIcon Symbol="Code24" FontSize="13" Margin="0,0,4,0" />
+                                                        <TextBlock Text="Xem JSON" FontSize="11" FontWeight="SemiBold" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Panel sơ đồ các Node -->
+                                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                                                  Padding="16,14">
+                                        <StackPanel x:Name="PanelWorkflowNodes" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="Chọn một Quy trình ở bảng trên để xem chi tiết luồng các bước..."
+                                                       FontSize="12" FontStyle="Italic"
+                                                       Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg3}"
+                                                       VerticalAlignment="Center" Margin="10,0,0,0" />
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </DockPanel>
+                            </Border>
+
+                            <GridSplitter Grid.Row="4" Height="8" HorizontalAlignment="Stretch" Background="Transparent" />
+
+                            <!-- BẢNG REVIEWS -->
+                            <Border Grid.Row="5" Background="{DynamicResource BIMUP.Fluent.Brush.CardBg}"
                                     BorderBrush="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" BorderThickness="1"
                                     CornerRadius="8" Padding="0">
                                 <DockPanel>

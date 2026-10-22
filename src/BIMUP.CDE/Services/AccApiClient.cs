@@ -595,6 +595,7 @@ public class AccApiClient
                     var stepsDesc = new List<string>();
                     var candidatesDesc = new List<string>();
                     var stepNamesById = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    var stepItems = new List<AccWorkflowStepItem>();
                     int stepCount = 0;
 
                     if (w.TryGetProperty("steps", out var stepsArr) && stepsArr.ValueKind == JsonValueKind.Array)
@@ -605,19 +606,45 @@ public class AccApiClient
                             var sId = step.TryGetProperty("id", out var sidEl) ? sidEl.GetString() ?? "" : "";
                             var sName = step.TryGetProperty("name", out var snEl) ? snEl.GetString() ?? "" : "";
                             var sType = step.TryGetProperty("type", out var stpEl) ? stpEl.GetString() ?? "" : "";
-                            var dur = step.TryGetProperty("duration", out var durEl) && durEl.ValueKind == JsonValueKind.Number
-                                ? $"{durEl.GetInt32()}d" : "";
+                            var durInt = step.TryGetProperty("duration", out var durEl) && durEl.ValueKind == JsonValueKind.Number
+                                ? durEl.GetInt32() : 0;
+                            var dur = durInt > 0 ? $"{durInt}d" : "";
+                            var dueType = step.TryGetProperty("dueDateType", out var dtEl) ? dtEl.GetString() ?? "CALENDAR_DAY" : "CALENDAR_DAY";
                             var stepLabel = string.IsNullOrEmpty(dur) ? $"{sName} ({sType})" : $"{sName} ({sType}, {dur})";
                             stepsDesc.Add(stepLabel);
                             if (!string.IsNullOrEmpty(sId))
                                 stepNamesById[sId] = stepLabel;
 
+                            var stepObj = new AccWorkflowStepItem
+                            {
+                                Order = stepCount,
+                                StepId = sId,
+                                Name = sName,
+                                Type = sType,
+                                Duration = durInt,
+                                DueDateType = dueType
+                            };
+
                             if (step.TryGetProperty("candidates", out var candObj) && candObj.ValueKind == JsonValueKind.Object)
                             {
+                                if (candObj.TryGetProperty("roles", out var rArr) && rArr.ValueKind == JsonValueKind.Array)
+                                {
+                                    foreach (var r in rArr.EnumerateArray())
+                                        if (r.TryGetProperty("name", out var rn) && rn.GetString() is string rns && !string.IsNullOrEmpty(rns))
+                                            stepObj.Roles.Add(rns);
+                                }
+                                if (candObj.TryGetProperty("users", out var uArr) && uArr.ValueKind == JsonValueKind.Array)
+                                {
+                                    foreach (var u in uArr.EnumerateArray())
+                                        if (u.TryGetProperty("name", out var un) && un.GetString() is string uns && !string.IsNullOrEmpty(uns))
+                                            stepObj.Users.Add(uns);
+                                }
+
                                 var stepCands = ExtractCandidatesNames(candObj);
                                 if (stepCands.Count > 0)
                                     candidatesDesc.Add($"{sName}: [{string.Join(", ", stepCands)}]");
                             }
+                            stepItems.Add(stepObj);
                         }
                     }
 
@@ -634,12 +661,25 @@ public class AccApiClient
                     }
 
                     var copyInfo = "Không";
+                    var targetFolderUrn = "";
+                    bool isCopyEnabled = false;
                     if (w.TryGetProperty("copyFilesOptions", out var cfObj) && cfObj.ValueKind == JsonValueKind.Object)
                     {
                         var enabled = cfObj.TryGetProperty("enabled", out var enEl) && enEl.ValueKind == JsonValueKind.True;
                         var fUrn = cfObj.TryGetProperty("folderUrn", out var fuEl) ? fuEl.GetString() ?? "" : "";
+                        targetFolderUrn = fUrn;
+                        isCopyEnabled = enabled;
                         if (enabled)
                             copyInfo = string.IsNullOrEmpty(fUrn) ? "Có copy" : $"Có ({fUrn})";
+                    }
+
+                    var createdBy = "Hệ thống CDE";
+                    if (w.TryGetProperty("createdBy", out var cbObj))
+                    {
+                        if (cbObj.ValueKind == JsonValueKind.Object && cbObj.TryGetProperty("name", out var cbn))
+                            createdBy = cbn.GetString() ?? "Hệ thống CDE";
+                        else if (cbObj.ValueKind == JsonValueKind.String)
+                            createdBy = cbObj.GetString() ?? "Hệ thống CDE";
                     }
 
                     var wfItem = new AccWorkflow
@@ -653,8 +693,12 @@ public class AccApiClient
                         CandidatesSummary = string.Join(" | ", candidatesDesc),
                         ApprovalOptionsSummary = string.Join(", ", approvalOpts),
                         CopyFilesInfo = copyInfo,
+                        CopyTargetFolderUrn = targetFolderUrn,
+                        CopyFilesEnabled = isCopyEnabled,
                         CreatedAt = createdAt,
-                        UpdatedAt = updatedAt
+                        UpdatedAt = updatedAt,
+                        CreatedBy = createdBy,
+                        Steps = stepItems
                     };
                     foreach (var kv in stepNamesById)
                         wfItem.StepNamesById[kv.Key] = kv.Value;

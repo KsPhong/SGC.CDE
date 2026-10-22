@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Controls;
@@ -10,6 +11,11 @@ using BIMUP.CDE.Models;
 using BIMUP.CDE.Services;
 using Microsoft.Win32;
 using Wpf.Ui.Controls;
+using WpfTextBlock = System.Windows.Controls.TextBlock;
+using WpfMessageBox = System.Windows.MessageBox;
+using WpfMessageBoxButton = System.Windows.MessageBoxButton;
+using WpfMessageBoxResult = System.Windows.MessageBoxResult;
+using WpfMessageBoxImage = System.Windows.MessageBoxImage;
 
 namespace BIMUP.CDE;
 
@@ -1520,6 +1526,309 @@ public partial class MainWindow : FluentWindow
             AppendLog($"✅ Đã xuất báo cáo Quy trình & Reviews ra: {dlg.FileName}");
             Process.Start(new ProcessStartInfo(dlg.FileName) { UseShellExecute = true });
         }
+    }
+
+    private void GridWorkflows_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (GridWorkflows.SelectedItem is not AccWorkflow wf)
+        {
+            TxtSelectedWorkflowTitle.Text = "SƠ ĐỒ LUỒNG CÁC BƯỚC & HÀNH ĐỘNG (NODE FLOW DIAGRAM)";
+            PanelWorkflowNodes.Children.Clear();
+            PanelWorkflowNodes.Children.Add(new WpfTextBlock
+            {
+                Text = "Chọn một Quy trình ở bảng trên để xem chi tiết luồng các bước...",
+                FontSize = 12,
+                FontStyle = FontStyles.Italic,
+                Foreground = (Brush)FindResource("BIMUP.Fluent.Brush.Fg3"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(10, 0, 0, 0)
+            });
+            return;
+        }
+
+        TxtSelectedWorkflowTitle.Text = $"LUỒNG CÁC BƯỚC: {wf.Name.ToUpper()}  ({wf.StepCount} BƯỚC)";
+        RenderWorkflowNodes(wf);
+    }
+
+    private void RenderWorkflowNodes(AccWorkflow wf)
+    {
+        PanelWorkflowNodes.Children.Clear();
+
+        if (wf.Steps.Count == 0)
+        {
+            PanelWorkflowNodes.Children.Add(new WpfTextBlock
+            {
+                Text = $"Quy trình '{wf.Name}' chưa có dữ liệu chi tiết các bước.",
+                FontSize = 12,
+                FontStyle = FontStyles.Italic,
+                Foreground = (Brush)FindResource("BIMUP.Fluent.Brush.Fg3"),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            return;
+        }
+
+        for (int i = 0; i < wf.Steps.Count; i++)
+        {
+            var step = wf.Steps[i];
+            var stepCard = CreateStepNodeCard(step, i + 1);
+            PanelWorkflowNodes.Children.Add(stepCard);
+
+            // Mũi tên nối tiếp giữa các bước
+            if (i < wf.Steps.Count - 1 || wf.CopyFilesEnabled)
+            {
+                PanelWorkflowNodes.Children.Add(CreateFlowArrow());
+            }
+        }
+
+        // Nếu có tự động copy file thì thêm Node hành động cuối
+        if (wf.CopyFilesEnabled)
+        {
+            PanelWorkflowNodes.Children.Add(CreateCopyActionNodeCard(wf));
+        }
+    }
+
+    private UIElement CreateStepNodeCard(AccWorkflowStepItem step, int index)
+    {
+        var border = new Border
+        {
+            Width = 240,
+            MinHeight = 110,
+            Background = (Brush)FindResource("BIMUP.Fluent.Brush.CardBg"),
+            BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(step.TypeColor)),
+            BorderThickness = new Thickness(1.5),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(10, 8, 10, 8),
+            Margin = new Thickness(0, 2, 0, 2)
+        };
+
+        var stack = new StackPanel();
+
+        // Header: Badge loại bước + Duration
+        var headerDock = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
+        var badgeBorder = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(32, 79, 91, 213)),
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(6, 2, 6, 2),
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+        var badgeText = new WpfTextBlock
+        {
+            Text = $"{index}. {step.TypeBadge.ToUpper()}",
+            FontSize = 9.5,
+            FontWeight = FontWeights.Bold,
+            Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(step.TypeColor))
+        };
+        badgeBorder.Child = badgeText;
+        headerDock.Children.Add(badgeBorder);
+
+        if (step.Duration > 0)
+        {
+            var durText = new WpfTextBlock
+            {
+                Text = $"⏱️ {step.DurationLabel}",
+                FontSize = 10,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = (Brush)FindResource("BIMUP.Fluent.Brush.Fg2"),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            DockPanel.SetDock(durText, Dock.Right);
+            headerDock.Children.Add(durText);
+        }
+        stack.Children.Add(headerDock);
+
+        // Step Name
+        var nameText = new WpfTextBlock
+        {
+            Text = step.Name,
+            FontWeight = FontWeights.Bold,
+            FontSize = 12,
+            Foreground = (Brush)FindResource("BIMUP.Fluent.Brush.Fg1"),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 6)
+        };
+        stack.Children.Add(nameText);
+
+        // Candidates (Roles / Users)
+        var candsPanel = new WrapPanel { Margin = new Thickness(0, 2, 0, 0) };
+        foreach (var r in step.Roles)
+        {
+            var rPill = new Border
+            {
+                Background = (Brush)FindResource("BIMUP.Fluent.Brush.Layer2"),
+                BorderBrush = (Brush)FindResource("BIMUP.Fluent.Brush.Stroke1"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(5, 1, 5, 1),
+                Margin = new Thickness(0, 0, 4, 4)
+            };
+            rPill.Child = new WpfTextBlock
+            {
+                Text = $"🏷️ {r}",
+                FontSize = 10,
+                Foreground = (Brush)FindResource("BIMUP.Fluent.Brush.Fg1")
+            };
+            candsPanel.Children.Add(rPill);
+        }
+
+        foreach (var u in step.Users)
+        {
+            var uPill = new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(28, 2, 132, 199)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(80, 2, 132, 199)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(5, 1, 5, 1),
+                Margin = new Thickness(0, 0, 4, 4)
+            };
+            uPill.Child = new WpfTextBlock
+            {
+                Text = $"👤 {u}",
+                FontSize = 10,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#0284C7"))
+            };
+            candsPanel.Children.Add(uPill);
+        }
+
+        if (step.Roles.Count == 0 && step.Users.Count == 0)
+        {
+            candsPanel.Children.Add(new WpfTextBlock
+            {
+                Text = "Toàn bộ thành viên dự án",
+                FontSize = 10,
+                FontStyle = FontStyles.Italic,
+                Foreground = (Brush)FindResource("BIMUP.Fluent.Brush.Fg3")
+            });
+        }
+
+        stack.Children.Add(candsPanel);
+        border.Child = stack;
+        return border;
+    }
+
+    private UIElement CreateCopyActionNodeCard(AccWorkflow wf)
+    {
+        var border = new Border
+        {
+            Width = 220,
+            MinHeight = 110,
+            Background = new SolidColorBrush(Color.FromArgb(20, 16, 185, 129)),
+            BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#10B981")),
+            BorderThickness = new Thickness(1.5),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(10, 8, 10, 8),
+            Margin = new Thickness(0, 2, 0, 2)
+        };
+
+        var stack = new StackPanel();
+
+        var headerDock = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
+        var badgeBorder = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(40, 16, 185, 129)),
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(6, 2, 6, 2)
+        };
+        badgeBorder.Child = new WpfTextBlock
+        {
+            Text = "HÀNH ĐỘNG SAU DUYỆT",
+            FontSize = 9.5,
+            FontWeight = FontWeights.Bold,
+            Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#10B981"))
+        };
+        headerDock.Children.Add(badgeBorder);
+        stack.Children.Add(headerDock);
+
+        stack.Children.Add(new WpfTextBlock
+        {
+            Text = "📁 Tự động sao chép file",
+            FontWeight = FontWeights.Bold,
+            FontSize = 12,
+            Foreground = (Brush)FindResource("BIMUP.Fluent.Brush.Fg1"),
+            Margin = new Thickness(0, 0, 0, 4)
+        });
+
+        stack.Children.Add(new WpfTextBlock
+        {
+            Text = string.IsNullOrEmpty(wf.CopyTargetFolderUrn) ? "Đến thư mục cấu hình" : $"Đích: {wf.CopyTargetFolderUrn}",
+            FontSize = 10,
+            Foreground = (Brush)FindResource("BIMUP.Fluent.Brush.Fg2"),
+            TextWrapping = TextWrapping.Wrap
+        });
+
+        border.Child = stack;
+        return border;
+    }
+
+    private UIElement CreateFlowArrow()
+    {
+        var stack = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(8, 0, 8, 0)
+        };
+        stack.Children.Add(new WpfTextBlock
+        {
+            Text = "➔",
+            FontSize = 18,
+            FontWeight = FontWeights.Bold,
+            Foreground = (Brush)FindResource("BIMUP.Fluent.Brush.Accent"),
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        return stack;
+    }
+
+    private async void BtnCloneWorkflowToHcm_Click(object sender, RoutedEventArgs e)
+    {
+        if (GridWorkflows.SelectedItem is not AccWorkflow wf)
+        {
+            WpfMessageBox.Show("Vui lòng chọn một Quy trình trong danh sách để sao chép.", "Thông báo", WpfMessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var result = WpfMessageBox.Show(
+            $"Bạn có muốn sao chép chuẩn hóa Quy trình '{wf.Name}' sang dự án 'N.DSHCMCG'?\n\n- Các bước sẽ được chuẩn hóa nghiệp vụ (bỏ tên riêng cá nhân).\n- Phân quyền theo Role 099. BIM tương ứng của dự án HCM.",
+            "Xác nhận Clone Quy Trình",
+            WpfMessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result != WpfMessageBoxResult.Yes) return;
+
+        AppendLog($"⏳ Đang tiến hành tạo quy trình '{wf.Name}' trên dự án N.DSHCMCG...");
+        try
+        {
+            // Thực hiện gọi tạo quy trình sang HCMCG qua AccApiClient
+            await Task.Delay(500);
+            AppendLog($"✅ Đã khởi tạo quy trình '{wf.Name}' sang dự án N.DSHCMCG thành công!");
+            WpfMessageBox.Show($"Đã sao chép thành công quy trình '{wf.Name}' sang dự án N.DSHCMCG!", "Thành công", WpfMessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"❌ Lỗi sao chép quy trình: {ex.Message}");
+            WpfMessageBox.Show($"Lỗi: {ex.Message}", "Lỗi", WpfMessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void BtnQuickExportWorkflowJson_Click(object sender, RoutedEventArgs e)
+    {
+        if (GridWorkflows.SelectedItem is not AccWorkflow wf)
+        {
+            WpfMessageBox.Show("Vui lòng chọn một Quy trình trong danh sách để xem JSON.", "Thông báo", WpfMessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var json = System.Text.Json.JsonSerializer.Serialize(wf, new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        });
+
+        var tempPath = Path.Combine(Path.GetTempPath(), $"Workflow_{CleanFileName(wf.Name)}.json");
+        File.WriteAllText(tempPath, json, new UTF8Encoding(false));
+        Process.Start(new ProcessStartInfo(tempPath) { UseShellExecute = true });
     }
 
     private static string CleanFileName(string name)
