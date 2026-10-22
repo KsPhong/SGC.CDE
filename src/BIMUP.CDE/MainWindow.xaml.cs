@@ -47,6 +47,11 @@ public partial class MainWindow : FluentWindow
     private bool _isUiReady;
     private bool _isFullProjectScanned;
 
+    // Trạng thái nạp lười (Lazy loading) theo từng Tab cho dự án hiện hành
+    private string? _loadedGovernanceProjectId;
+    private string? _loadedWorkflowsProjectId;
+    private string? _loadedIssuesProjectId;
+
     public MainWindow()
     {
         try
@@ -603,7 +608,7 @@ public partial class MainWindow : FluentWindow
             TxtProgressStatus.Text = status;
     }
 
-    private void NavList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void NavList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_isUiReady || MainTabs == null) return;
         var idx = NavList.SelectedIndex;
@@ -612,6 +617,157 @@ public partial class MainWindow : FluentWindow
             MainTabs.SelectedIndex = idx;
             if (NavList.SelectedItem is ListBoxItem item && item.Tag is string title)
                 TxtPageTitle.Text = title;
+
+            // Kích hoạt nạp lười (Lazy Load) theo Tab nếu dự án đã được chọn
+            if (CboHubs.SelectedItem is AccHub hub && CboProjects.SelectedItem is AccProject proj)
+            {
+                if (idx == 1 && _loadedGovernanceProjectId != proj.Id)
+                {
+                    await LoadGovernanceTabAsync(hub.Id, proj.Id);
+                }
+                else if (idx == 2 && _loadedWorkflowsProjectId != proj.Id)
+                {
+                    await LoadWorkflowsTabAsync(proj.Id);
+                }
+                else if (idx == 3 && _loadedIssuesProjectId != proj.Id)
+                {
+                    await LoadIssuesTabAsync(proj.Id);
+                }
+            }
+        }
+    }
+
+    private async Task LoadGovernanceTabAsync(string hubId, string projectId)
+    {
+        try
+        {
+            SetBusy(true, "Đang tải Roles, Thành viên và Phân quyền thư mục...");
+            _loadedGovernanceProjectId = projectId;
+
+            // 1. Roles
+            try
+            {
+                var roles = await _api.GetProjectRolesAsync(hubId, projectId);
+                _allRoles.Clear();
+                _allRoles.AddRange(roles);
+                AppendLog($"🎖️ Đã tải {roles.Count} Roles của dự án.");
+            }
+            catch (Exception ex) { AppendLog($"⚠️ Lỗi tải Roles: {ex.Message}"); }
+
+            // 2. Members & Companies
+            try
+            {
+                var projMembers = await _api.GetProjectMembersAsync(projectId);
+                var accUsers = await _api.GetAccountUsersAsync(hubId);
+                var companies = await _api.GetAccountCompaniesAsync(hubId);
+
+                var projEmails = new HashSet<string>(
+                    projMembers.Where(m => !string.IsNullOrEmpty(m.Email)).Select(m => m.Email),
+                    StringComparer.OrdinalIgnoreCase);
+
+                var extraHubUsers = accUsers.Where(u => string.IsNullOrEmpty(u.Email) || !projEmails.Contains(u.Email)).ToList();
+
+                _allMembers.Clear();
+                _allMembers.AddRange(projMembers);
+                _allMembers.AddRange(extraHubUsers);
+
+                _allCompanies.Clear();
+                _allCompanies.AddRange(companies);
+                AppendLog($"👥 Đã tải {projMembers.Count} Thành viên dự án (+{extraHubUsers.Count} Hub Members, {companies.Count} Công ty).");
+            }
+            catch (Exception ex) { AppendLog($"⚠️ Lỗi tải Thành viên: {ex.Message}"); }
+
+            // 3. Phân quyền thư mục cấp 1
+            try
+            {
+                var targetFolders = new List<AccFolder>();
+                foreach (var r in _treeRoots)
+                {
+                    targetFolders.Add(r);
+                    foreach (var sub in r.Children.Take(10))
+                        targetFolders.Add(sub);
+                }
+
+                var perms = new List<AccPermission>();
+                foreach (var tf in targetFolders)
+                {
+                    var fp = await _api.GetFolderPermissionsAsync(projectId, tf);
+                    perms.AddRange(fp);
+                }
+
+                _allPermissions.Clear();
+                _allPermissions.AddRange(perms);
+                AppendLog($"🔐 Đã tải {perms.Count} Phân quyền thư mục.");
+            }
+            catch (Exception ex) { AppendLog($"⚠️ Lỗi tải Phân quyền: {ex.Message}"); }
+
+            ApplyGovernanceFilter();
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    private async Task LoadWorkflowsTabAsync(string projectId)
+    {
+        try
+        {
+            SetBusy(true, "Đang tải Quy trình phê duyệt & Đợt trình duyệt (Reviews)...");
+            _loadedWorkflowsProjectId = projectId;
+
+            var workflows = await _api.GetApprovalWorkflowsAsync(projectId);
+            var reviews = await _api.GetProjectReviewsAsync(projectId, workflows);
+
+            _allWorkflows.Clear();
+            _allWorkflows.AddRange(workflows);
+            _allReviews.Clear();
+            _allReviews.AddRange(reviews);
+            ApplyWorkflowFilter();
+
+            AppendLog($"✅ Đã tải {workflows.Count} Workflows & {reviews.Count} Reviews.");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"⚠️ Lỗi tải Workflows / Reviews: {ex.Message}");
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    private async Task LoadIssuesTabAsync(string projectId)
+    {
+        try
+        {
+            SetBusy(true, "Đang tải Issues & Gói phát hành (Transmittals)...");
+            _loadedIssuesProjectId = projectId;
+
+            var transmittals = await _api.GetProjectTransmittalsAsync(projectId);
+            var (issues, issueNote) = await _api.GetProjectIssuesAsync(projectId);
+
+            _transmittals.Clear();
+            foreach (var t in transmittals)
+                _transmittals.Add(t);
+
+            _issues.Clear();
+            foreach (var iss in issues)
+                _issues.Add(iss);
+
+            TxtIssuesNote.Text = !string.IsNullOrEmpty(issueNote)
+                ? $"ℹ️ {issueNote}  ·  Hồ sơ phát hành (Transmittals): {transmittals.Count}"
+                : $"Đã tải {issues.Count} Issues và {transmittals.Count} Gói phát hành (Transmittals).";
+
+            AppendLog($"📬 Đã tải {issues.Count} Issues & {transmittals.Count} Transmittals.");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"⚠️ Lỗi tải Transmittals / Issues: {ex.Message}");
+        }
+        finally
+        {
+            SetBusy(false);
         }
     }
 
@@ -765,25 +921,46 @@ public partial class MainWindow : FluentWindow
         if (CboHubs.SelectedItem is not AccHub hub || CboProjects.SelectedItem is not AccProject proj) return;
         try
         {
-            SetBusy(true, $"Đang tải dữ liệu của dự án '{proj.Name}'...");
+            SetBusy(true, $"Đang mở dự án '{proj.Name}'...");
             _isFullProjectScanned = false;
             _mcpBridge.UpdateDocumentContext($"{hub.Name} / {proj.Name}");
+
+            // Đặt lại cờ nạp của các tab để khi người dùng chuyển sang tab nào mới tải tab đó
+            _loadedGovernanceProjectId = null;
+            _loadedWorkflowsProjectId = null;
+            _loadedIssuesProjectId = null;
+
+            // Xóa dữ liệu cũ của dự án trước
+            _treeRoots.Clear();
+            _allFolders.Clear();
+            _allFiles.Clear();
+            _allRoles.Clear();
+            _allMembers.Clear();
+            _allCompanies.Clear();
+            _allPermissions.Clear();
+            _allWorkflows.Clear();
+            _allReviews.Clear();
+            _issues.Clear();
+            _transmittals.Clear();
+
+            _filteredFolders.Clear();
+            _filteredFiles.Clear();
+            _filteredRoles.Clear();
+            _filteredMembers.Clear();
+            _filteredPermissions.Clear();
+            _filteredWorkflows.Clear();
+            _filteredReviews.Clear();
 
             var folders = await _api.GetTopFoldersAsync(hub.Id, proj.Id);
             CboTopFolders.ItemsSource = folders;
 
-            _treeRoots.Clear();
-            _allFolders.Clear();
-            _allFiles.Clear();
             foreach (var f in folders)
             {
                 _treeRoots.Add(f);
             }
 
             CboTopFolders.SelectedIndex = folders.Count > 0 ? 0 : -1;
-
-            // Tự động tải đồng bộ Roles, Members, Workflows, Reviews, Transmittals & Issues cho dự án
-            await LoadProjectGovernanceAsync(hub.Id, proj.Id);
+            AppendLog($"Dự án '{proj.Name}': Đã tải xong {folders.Count} thư mục gốc (Top Folders).");
         }
         catch (Exception ex)
         {
