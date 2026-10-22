@@ -12,6 +12,8 @@ using BIMUP.CDE.Services;
 using Microsoft.Win32;
 using Wpf.Ui.Controls;
 using WpfTextBlock = System.Windows.Controls.TextBlock;
+using WpfButton = System.Windows.Controls.Button;
+using WpfTextBox = System.Windows.Controls.TextBox;
 using WpfMessageBox = System.Windows.MessageBox;
 using WpfMessageBoxButton = System.Windows.MessageBoxButton;
 using WpfMessageBoxResult = System.Windows.MessageBoxResult;
@@ -1631,11 +1633,28 @@ public partial class MainWindow : FluentWindow
                 FontWeight = FontWeights.SemiBold,
                 Foreground = (Brush)FindResource("BIMUP.Fluent.Brush.Fg2"),
                 HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 6, 0)
             };
             DockPanel.SetDock(durText, Dock.Right);
             headerDock.Children.Add(durText);
         }
+
+        var btnEditStep = new WpfButton
+        {
+            Content = "✏️",
+            ToolTip = $"Chỉnh sửa bước '{step.Name}' (Đổi tên, thời hạn ngày, roles)",
+            Style = (Style)FindResource("Btn.Subtle"),
+            Width = 24,
+            Height = 22,
+            Padding = new Thickness(0),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        btnEditStep.Click += (s, e) => ShowEditStepDialog(step);
+        DockPanel.SetDock(btnEditStep, Dock.Right);
+        headerDock.Children.Add(btnEditStep);
+
         stack.Children.Add(headerDock);
 
         // Step Name
@@ -1781,6 +1800,54 @@ public partial class MainWindow : FluentWindow
         return stack;
     }
 
+    private async void BtnSaveWorkflowToAcc_Click(object sender, RoutedEventArgs e)
+    {
+        if (GridWorkflows.SelectedItem is not AccWorkflow wf)
+        {
+            WpfMessageBox.Show("Vui lòng chọn một Quy trình trong danh sách để lưu.", "Thông báo", WpfMessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var hub = CboHubs.SelectedItem as AccHub;
+        var proj = CboProjects.SelectedItem as AccProject;
+        if (hub == null || proj == null)
+        {
+            WpfMessageBox.Show("Vui lòng chọn Dự án hiện hành trước.", "Lỗi", WpfMessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var result = WpfMessageBox.Show(
+            $"Bạn có muốn lưu các thay đổi trên luồng các bước của Quy trình '{wf.Name}' lên Autodesk ACC không?\n\n- Hệ thống sẽ tạo bản cập nhật mới trên ACC với các bước và thời hạn đã chỉnh sửa.\n- Bản mới sẽ được kích hoạt cho dự án.",
+            "Xác nhận Lưu lên Autodesk ACC",
+            WpfMessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result != WpfMessageBoxResult.Yes) return;
+
+        AppendLog($"⏳ Đang lưu cập nhật quy trình '{wf.Name}' lên Autodesk ACC...");
+        try
+        {
+            var newId = await _api.CreateApprovalWorkflowAsync(
+                proj.Id,
+                wf.Name,
+                wf.Description,
+                wf.Steps,
+                wf.CopyFilesEnabled,
+                wf.CopyTargetFolderUrn);
+
+            AppendLog($"✅ Đã lưu quy trình '{wf.Name}' thành công lên ACC! (ID mới: {newId})");
+            WpfMessageBox.Show($"Đã lưu quy trình '{wf.Name}' thành công lên Autodesk ACC!", "Thành công", WpfMessageBoxButton.OK, MessageBoxImage.Information);
+            
+            // Tải lại danh sách workflows
+            await LoadProjectGovernanceAsync(hub.Id, proj.Id);
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"❌ Lỗi lưu quy trình: {ex.Message}");
+            WpfMessageBox.Show($"Lỗi: {ex.Message}", "Lỗi lưu quy trình", WpfMessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private async void BtnCloneWorkflowToHcm_Click(object sender, RoutedEventArgs e)
     {
         if (GridWorkflows.SelectedItem is not AccWorkflow wf)
@@ -1810,6 +1877,105 @@ public partial class MainWindow : FluentWindow
             AppendLog($"❌ Lỗi sao chép quy trình: {ex.Message}");
             WpfMessageBox.Show($"Lỗi: {ex.Message}", "Lỗi", WpfMessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    private void ShowEditStepDialog(AccWorkflowStepItem step)
+    {
+        var editWindow = new Window
+        {
+            Title = $"Chỉnh sửa bước: {step.Name}",
+            Width = 460,
+            Height = 360,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Owner = this,
+            Background = (Brush)FindResource("BIMUP.Fluent.Brush.WindowBg"),
+            Foreground = (Brush)FindResource("BIMUP.Fluent.Brush.Fg1"),
+            ResizeMode = ResizeMode.NoResize
+        };
+
+        var rootGrid = new Grid { Margin = new Thickness(20) };
+        rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        rootGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        // Tên bước
+        var lblName = new WpfTextBlock { Text = "Tên bước quy trình:", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 4) };
+        Grid.SetRow(lblName, 0);
+        rootGrid.Children.Add(lblName);
+
+        var txtName = new WpfTextBox { Text = step.Name, Height = 32, Margin = new Thickness(0, 0, 0, 12) };
+        Grid.SetRow(txtName, 1);
+        rootGrid.Children.Add(txtName);
+
+        // Thời hạn xử lý
+        var lblDur = new WpfTextBlock { Text = "Thời hạn xử lý (Số ngày):", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 4) };
+        Grid.SetRow(lblDur, 2);
+        rootGrid.Children.Add(lblDur);
+
+        var txtDur = new WpfTextBox { Text = step.Duration.ToString(), Height = 32, Margin = new Thickness(0, 0, 0, 12) };
+        Grid.SetRow(txtDur, 3);
+        rootGrid.Children.Add(txtDur);
+
+        // Danh sách Role tham gia
+        var lblRoles = new WpfTextBlock { Text = "Các Role tham gia (phân cách bằng dấu phẩy):", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 4) };
+        Grid.SetRow(lblRoles, 4);
+        var rolesPanel = new StackPanel();
+        rolesPanel.Children.Add(lblRoles);
+        var txtRoles = new WpfTextBox
+        {
+            Text = string.Join(", ", step.Roles),
+            Height = 32,
+            ToolTip = "Ví dụ: 099. BIM, 061. TVTK"
+        };
+        rolesPanel.Children.Add(txtRoles);
+        rootGrid.Children.Add(rolesPanel);
+
+        // Nút Lưu / Hủy
+        var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0) };
+        Grid.SetRow(btnPanel, 5);
+
+        var btnCancel = new WpfButton { Content = "Hủy", Width = 80, Height = 30, Margin = new Thickness(0, 0, 8, 0), Style = (Style)FindResource("Btn.Subtle") };
+        btnCancel.Click += (s, e) => editWindow.Close();
+        btnPanel.Children.Add(btnCancel);
+
+        var btnSave = new WpfButton { Content = "Lưu Thay Đổi", Width = 110, Height = 30, Style = (Style)FindResource("Btn.Accent") };
+        btnSave.Click += (s, e) =>
+        {
+            var newName = txtName.Text.Trim();
+            if (string.IsNullOrEmpty(newName))
+            {
+                WpfMessageBox.Show("Tên bước không được để trống!", "Lỗi", WpfMessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (int.TryParse(txtDur.Text.Trim(), out int d))
+                step.Duration = Math.Max(0, d);
+
+            step.Name = newName;
+            var parts = txtRoles.Text.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+            step.Roles.Clear();
+            foreach (var p in parts)
+            {
+                var trimmed = p.Trim();
+                if (!string.IsNullOrEmpty(trimmed))
+                    step.Roles.Add(trimmed);
+            }
+
+            editWindow.Close();
+            if (GridWorkflows.SelectedItem is AccWorkflow curWf)
+            {
+                RenderWorkflowNodes(curWf);
+            }
+            AppendLog($"✏️ Đã cập nhật bước '{step.Name}' (Hạn: {step.DurationLabel}, Roles: {string.Join(", ", step.Roles)})");
+        };
+        btnPanel.Children.Add(btnSave);
+
+        rootGrid.Children.Add(btnPanel);
+        editWindow.Content = rootGrid;
+        editWindow.ShowDialog();
     }
 
     private void BtnQuickExportWorkflowJson_Click(object sender, RoutedEventArgs e)

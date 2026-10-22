@@ -722,6 +722,89 @@ public class AccApiClient
     }
 
     /// <summary>
+    /// Tạo mới một Quy trình phê duyệt (Approval Workflow) trên dự án ACC.
+    /// </summary>
+    public async Task<string> CreateApprovalWorkflowAsync(
+        string projectId,
+        string name,
+        string description,
+        List<AccWorkflowStepItem> steps,
+        bool copyEnabled,
+        string? copyTargetFolderUrn,
+        CancellationToken ct = default)
+    {
+        var cleanProjId = CleanId(projectId);
+        var xUserId = await ResolveProjectAdminAutodeskIdAsync(cleanProjId, ct);
+        var url = $"{BaseUrl}/construction/reviews/v1/projects/{Uri.EscapeDataString(cleanProjId)}/workflows";
+
+        // Lấy danh sách Roles của dự án để map đúng AutodeskId nếu cần
+        // Xây dựng steps payload đúng chuẩn ACC Reviews API
+        var stepsPayload = new List<object>();
+        foreach (var s in steps)
+        {
+            var roleList = new List<object>();
+            foreach (var r in s.Roles)
+            {
+                // Nếu r là dạng autodeskId số
+                roleList.Add(new { autodeskId = r });
+            }
+
+            var stepObj = new Dictionary<string, object>
+            {
+                ["name"] = s.Name,
+                ["type"] = s.Type,
+                ["candidates"] = new Dictionary<string, object>
+                {
+                    ["roles"] = roleList
+                }
+            };
+
+            if (s.Duration > 0)
+            {
+                stepObj["duration"] = s.Duration;
+                stepObj["dueDateType"] = string.IsNullOrEmpty(s.DueDateType) ? "CALENDAR_DAY" : s.DueDateType;
+            }
+
+            stepsPayload.Add(stepObj);
+        }
+
+        var copyObj = new Dictionary<string, object?>
+        {
+            ["enabled"] = copyEnabled
+        };
+        if (copyEnabled && !string.IsNullOrEmpty(copyTargetFolderUrn))
+        {
+            copyObj["folderUrn"] = copyTargetFolderUrn;
+            copyObj["allowOverride"] = true;
+            copyObj["condition"] = "ANY";
+            copyObj["includeMarkups"] = true;
+        }
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["name"] = name,
+            ["description"] = description,
+            ["steps"] = stepsPayload,
+            ["copyFilesOptions"] = copyObj
+        };
+
+        var json = JsonSerializer.Serialize(payload);
+        using var req = new HttpRequestMessage(HttpMethod.Post, url);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+        if (!string.IsNullOrEmpty(xUserId))
+            req.Headers.TryAddWithoutValidation("x-user-id", xUserId);
+        req.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        using var resp = await _http.SendAsync(req, ct);
+        var body = await resp.Content.ReadAsStringAsync(ct);
+        if (!resp.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Lỗi tạo quy trình ({(int)resp.StatusCode}): {body}");
+
+        using var doc = JsonDocument.Parse(body);
+        return doc.RootElement.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? "" : "";
+    }
+
+    /// <summary>
     /// Lấy danh sách tất cả các Đợt trình duyệt hồ sơ (Reviews) trong dự án kèm danh sách file trong mỗi đợt.
     /// </summary>
     public async Task<List<AccReview>> GetProjectReviewsAsync(

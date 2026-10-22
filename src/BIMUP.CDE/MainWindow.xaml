@@ -908,6 +908,15 @@
                                                            Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" VerticalAlignment="Center" />
                                             </StackPanel>
                                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                <Button x:Name="BtnSaveWorkflowToAcc" Style="{StaticResource Btn.Accent}"
+                                                        Padding="10,0" Height="26" Margin="0,0,6,0"
+                                                        ToolTip="Lưu các thay đổi trên luồng các bước lên Autodesk ACC"
+                                                        Click="BtnSaveWorkflowToAcc_Click">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <ui:SymbolIcon Symbol="Save24" FontSize="13" Margin="0,0,4,0" />
+                                                        <TextBlock Text="Lưu Lên ACC" FontSize="11" FontWeight="SemiBold" />
+                                                    </StackPanel>
+                                                </Button>
                                                 <Button x:Name="BtnCloneWorkflowToHcm" Style="{StaticResource Btn.Subtle}"
                                                         Padding="10,0" Height="26" Margin="0,0,6,0"
                                                         ToolTip="Sao chép chuẩn hóa quy trình này sang dự án N.DSHCMCG"
