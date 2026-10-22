@@ -1,0 +1,35 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib"
+                    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+
+    <!--
+        Default style cho ui:FluentWindow.
+
+        Vấn đề đã gặp: Mica/Acrylic FluentWindow trên Windows 11 tự vẽ rounded
+        corner (~8px radius) ở 4 góc qua DWM. Nội dung ở góc dưới (vd Close button
+        flush right) bị clip bởi corner radius — "nút bị cửa sổ liếm vào".
+
+        Fix: Padding="0,0,0,8" ở root window → clearance đúng bằng corner radius.
+        Top không cần vì TitleBar custom (Auto height) đã chiếm chỗ.
+
+        Cũng set MinWidth/MinHeight để chống resize quá nhỏ làm vỡ layout footer.
+    -->
+
+    <sys:Double x:Key="BIMUP.Fluent.Window.BottomClearance">8</sys:Double>
+    <sys:Double x:Key="BIMUP.Fluent.Window.MinWidth">480</sys:Double>
+    <sys:Double x:Key="BIMUP.Fluent.Window.MinHeight">320</sys:Double>
+
+    <!-- BIMUP MCP Studio: BỎ style ngầm cho ui:FluentWindow của bản gốc. Nạp ở Application.Resources, style đó (không
+         BasedOn) che mất style WPF-UI có Template → cửa sổ trống trơn. Padding / Font / Foreground đặt thẳng trên MainWindow. -->
+    <!--
+    <Style TargetType="{x:Type ui:FluentWindow}">
+        <Setter Property="Padding" Value="0,0,0,8" />
+        <Setter Property="MinWidth" Value="{StaticResource BIMUP.Fluent.Window.MinWidth}" />
+        <Setter Property="MinHeight" Value="{StaticResource BIMUP.Fluent.Window.MinHeight}" />
+        <Setter Property="FontFamily" Value="{DynamicResource BIMUP.Fluent.Font.Text}" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Fg1}" />
+    </Style>
+    -->
+
+</ResourceDictionary>

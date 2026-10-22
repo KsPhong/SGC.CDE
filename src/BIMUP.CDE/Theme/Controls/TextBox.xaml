@@ -1,0 +1,211 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         TextBox / PasswordBox — HTML .input:
+            background ctrl-rest, border stroke2 + bottom stroke-accessible,
+            focus → underline 2px accent mọc từ giữa (ScaleX 0→1).
+            r 6, h 34, padding 0 12.
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- ─── TextBox (single-line) ─── -->
+    <Style x:Key="BIMUP.Fluent.TextBox" TargetType="TextBox">
+        <Setter Property="Height"     Value="{DynamicResource BIMUP.Fluent.Size.Ctrl}" />
+        <Setter Property="Padding"    Value="0" />
+        <Setter Property="FontFamily" Value="{DynamicResource BIMUP.Fluent.Font.Text}" />
+        <Setter Property="FontSize"   Value="14" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Fg1}" />
+        <Setter Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.CtrlRest}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BIMUP.Fluent.Brush.Stroke2}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CaretBrush" Value="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+        <Setter Property="SelectionBrush" Value="{DynamicResource BIMUP.Fluent.Brush.AccentTintHover}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Grid>
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{DynamicResource BIMUP.Fluent.Radius.Control}"
+                                SnapsToDevicePixels="True">
+                            <!-- bottom-accessible underline (luôn hiển thị nét đậm hơn ở đáy) -->
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="0" ShadowDepth="0" Opacity="0" />
+                            </Border.Effect>
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <ScrollViewer x:Name="PART_ContentHost"
+                                              Grid.Row="0"
+                                              Margin="12,0"
+                                              VerticalAlignment="Center"
+                                              Focusable="False"
+                                              HorizontalScrollBarVisibility="Hidden"
+                                              VerticalScrollBarVisibility="Hidden" />
+                                <!-- Bottom accessible line (Fluent stroke-accessible 45%) -->
+                                <Rectangle x:Name="BottomAccent"
+                                           Grid.Row="0"
+                                           VerticalAlignment="Bottom"
+                                           Height="1"
+                                           Fill="{DynamicResource BIMUP.Fluent.Brush.StrokeAccessible}"
+                                           Margin="0,0,0,-1" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Placeholder text (hiển thị khi Text rỗng) -->
+                        <TextBlock x:Name="Placeholder"
+                                   Text="{TemplateBinding Tag}"
+                                   Margin="13,0,0,0"
+                                   VerticalAlignment="Center"
+                                   IsHitTestVisible="False"
+                                   Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg3}"
+                                   Visibility="Collapsed" />
+
+                        <!-- Focus underline (mọc từ giữa, ScaleX 0→1) -->
+                        <Border x:Name="FocusUnderline"
+                                VerticalAlignment="Bottom"
+                                Height="2"
+                                Background="{DynamicResource BIMUP.Fluent.Brush.Accent}"
+                                CornerRadius="0,0,1,1"
+                                RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <ScaleTransform ScaleX="0" ScaleY="1" />
+                            </Border.RenderTransform>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="Text" Value="">
+                            <Setter TargetName="Placeholder" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.CtrlHover}" />
+                        </Trigger>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter TargetName="Root" Property="Background"   Value="#FFFFFFFF" />
+                            <Setter TargetName="BottomAccent" Property="Fill" Value="Transparent" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="FocusUnderline"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                         To="1" Duration="0:0:0.20">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="FocusUnderline"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                         To="0" Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Root" Property="Background"  Value="{DynamicResource BIMUP.Fluent.Brush.CtrlDisabled}" />
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" />
+                            <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.FgDisabled}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ─── PasswordBox — y hệt TextBox về visual ─── -->
+    <Style x:Key="BIMUP.Fluent.PasswordBox" TargetType="PasswordBox">
+        <Setter Property="Height"     Value="{DynamicResource BIMUP.Fluent.Size.Ctrl}" />
+        <Setter Property="FontFamily" Value="{DynamicResource BIMUP.Fluent.Font.Text}" />
+        <Setter Property="FontSize"   Value="14" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Fg1}" />
+        <Setter Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.CtrlRest}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BIMUP.Fluent.Brush.Stroke2}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CaretBrush" Value="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+        <Setter Property="SelectionBrush" Value="{DynamicResource BIMUP.Fluent.Brush.AccentTintHover}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="PasswordChar" Value="●" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="PasswordBox">
+                    <Grid>
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{DynamicResource BIMUP.Fluent.Radius.Control}"
+                                SnapsToDevicePixels="True">
+                            <Grid>
+                                <ScrollViewer x:Name="PART_ContentHost"
+                                              Margin="12,0"
+                                              VerticalAlignment="Center"
+                                              Focusable="False"
+                                              HorizontalScrollBarVisibility="Hidden"
+                                              VerticalScrollBarVisibility="Hidden" />
+                                <Rectangle x:Name="BottomAccent"
+                                           VerticalAlignment="Bottom"
+                                           Height="1"
+                                           Fill="{DynamicResource BIMUP.Fluent.Brush.StrokeAccessible}"
+                                           Margin="0,0,0,-1" />
+                            </Grid>
+                        </Border>
+                        <Border x:Name="FocusUnderline"
+                                VerticalAlignment="Bottom"
+                                Height="2"
+                                Background="{DynamicResource BIMUP.Fluent.Brush.Accent}"
+                                RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <ScaleTransform ScaleX="0" ScaleY="1" />
+                            </Border.RenderTransform>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.CtrlHover}" />
+                        </Trigger>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter TargetName="Root" Property="Background"   Value="#FFFFFFFF" />
+                            <Setter TargetName="BottomAccent" Property="Fill" Value="Transparent" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="FocusUnderline"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                         To="1" Duration="0:0:0.20">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="FocusUnderline"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                         To="0" Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

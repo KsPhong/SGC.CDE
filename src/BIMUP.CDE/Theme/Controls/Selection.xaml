@@ -1,0 +1,439 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Selection — CheckBox · RadioButton · ToggleSwitch · Slider.
+
+         Tất cả viết Template thuần WPF cho animation pixel-perfect như HTML:
+           · Check: pop scale 0.86 + tick stroke vẽ (dash-array reveal)
+           · Radio: chấm trong nở từ 0 → 10px (Width/Height anim)
+           · Switch: knob squish (Width 12→17), translate 3→21, color change
+           · Slider: rail + fill + thumb với inner-dot scale
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         CheckBox — 20×20, border 1.5px, tick vẽ stroke
+         ═══════════════════════════════════════════════════════════════════ -->
+    <Style x:Key="BIMUP.Fluent.CheckBox" TargetType="CheckBox">
+        <Setter Property="FontFamily" Value="{DynamicResource BIMUP.Fluent.Font.Text}" />
+        <Setter Property="FontSize"   Value="14" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Fg1}" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Cursor"     Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <StackPanel Orientation="Horizontal" Background="Transparent">
+                        <!-- x:Name UIElement (PopHost), animate Transform qua property path. -->
+                        <Grid x:Name="PopHost"
+                              Width="20" Height="20"
+                              VerticalAlignment="Center"
+                              Margin="0,0,10,0"
+                              RenderTransformOrigin="0.5,0.5">
+                            <Grid.RenderTransform>
+                                <ScaleTransform ScaleX="1" ScaleY="1" />
+                            </Grid.RenderTransform>
+                            <Border x:Name="Box"
+                                    Background="{DynamicResource BIMUP.Fluent.Brush.CtrlRest}"
+                                    BorderBrush="{DynamicResource BIMUP.Fluent.Brush.StrokeAccessible}"
+                                    BorderThickness="1.5"
+                                    CornerRadius="5"
+                                    SnapsToDevicePixels="True" />
+                            <!-- Tick path (stroke-dash reveal) -->
+                            <Path x:Name="Tick"
+                                  Stroke="#FFFFFFFF"
+                                  StrokeThickness="2.2"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round"
+                                  Data="M 4 10 L 8 14 L 16 5"
+                                  Stretch="None"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  StrokeDashArray="22 22"
+                                  StrokeDashOffset="22"
+                                  Width="20" Height="20" />
+                            <!-- Indeterminate horizontal bar -->
+                            <Border x:Name="IndetBar"
+                                    Width="10" Height="2.5"
+                                    Background="#FFFFFFFF"
+                                    CornerRadius="2"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Visibility="Collapsed" />
+                        </Grid>
+                        <ContentPresenter VerticalAlignment="Center"
+                                          TextElement.Foreground="{TemplateBinding Foreground}"
+                                          TextElement.FontFamily="{TemplateBinding FontFamily}"
+                                          TextElement.FontSize="{TemplateBinding FontSize}" />
+                    </StackPanel>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Box" Property="Background"  Value="{DynamicResource BIMUP.Fluent.Brush.CtrlHover}" />
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource BIMUP.Fluent.Brush.Fg3}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Box" Property="Background"  Value="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Tick" Storyboard.TargetProperty="StrokeDashOffset"
+                                                         From="22" To="0" Duration="0:0:0.20">
+                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="PopHost" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)">
+                                            <SplineDoubleKeyFrame KeyTime="0:0:0.10" Value="0.86" />
+                                            <SplineDoubleKeyFrame KeyTime="0:0:0.20" Value="1" />
+                                        </DoubleAnimationUsingKeyFrames>
+                                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="PopHost" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)">
+                                            <SplineDoubleKeyFrame KeyTime="0:0:0.10" Value="0.86" />
+                                            <SplineDoubleKeyFrame KeyTime="0:0:0.20" Value="1" />
+                                        </DoubleAnimationUsingKeyFrames>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Tick" Storyboard.TargetProperty="StrokeDashOffset"
+                                                         To="22" Duration="0:0:0.10" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="{x:Null}">
+                            <Setter TargetName="Box"      Property="Background"  Value="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+                            <Setter TargetName="Box"      Property="BorderBrush" Value="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+                            <Setter TargetName="IndetBar" Property="Visibility"  Value="Visible" />
+                            <Setter TargetName="Tick"     Property="Visibility"  Value="Collapsed" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                            <Setter Property="Cursor"  Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         RadioButton — 20×20, dot nở từ tâm (Width 0 → 10)
+         ═══════════════════════════════════════════════════════════════════ -->
+    <Style x:Key="BIMUP.Fluent.RadioButton" TargetType="RadioButton">
+        <Setter Property="FontFamily" Value="{DynamicResource BIMUP.Fluent.Font.Text}" />
+        <Setter Property="FontSize"   Value="14" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Fg1}" />
+        <Setter Property="Cursor"     Value="Hand" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <StackPanel Orientation="Horizontal" Background="Transparent">
+                        <Grid Width="20" Height="20"
+                              VerticalAlignment="Center"
+                              Margin="0,0,10,0">
+                            <Ellipse x:Name="Dot"
+                                     Stroke="{DynamicResource BIMUP.Fluent.Brush.StrokeAccessible}"
+                                     StrokeThickness="1.5"
+                                     Fill="{DynamicResource BIMUP.Fluent.Brush.CtrlRest}" />
+                            <Ellipse x:Name="Inner"
+                                     Width="0" Height="0"
+                                     Fill="{DynamicResource BIMUP.Fluent.Brush.Accent}"
+                                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Grid>
+                        <ContentPresenter VerticalAlignment="Center"
+                                          TextElement.Foreground="{TemplateBinding Foreground}"
+                                          TextElement.FontFamily="{TemplateBinding FontFamily}"
+                                          TextElement.FontSize="{TemplateBinding FontSize}" />
+                    </StackPanel>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Dot" Property="Stroke" Value="{DynamicResource BIMUP.Fluent.Brush.Fg3}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Dot" Property="Stroke" Value="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Inner" Storyboard.TargetProperty="Width"
+                                                         To="10" Duration="0:0:0.20">
+                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="Inner" Storyboard.TargetProperty="Height"
+                                                         To="10" Duration="0:0:0.20">
+                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Inner" Storyboard.TargetProperty="Width"  To="0" Duration="0:0:0.12" />
+                                        <DoubleAnimation Storyboard.TargetName="Inner" Storyboard.TargetProperty="Height" To="0" Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                            <Setter Property="Cursor"  Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         ToggleSwitch (ToggleButton style) — khớp 1-1 với HTML reference.
+
+            HTML CSS:
+              .switch .track   { 40×22 · r-pill · border 1.5 stroke-accessible }
+              .switch .track::after { left:3 · top:50% transY(-50%)
+                                      12×12 · r-pill · bg fg-2 }
+              :hover  → knob width 14
+              :active → knob width 17
+              :checked → track bg=brand, border=brand, knob bg=#fff, left=21
+
+         WPF fix:
+           · Knob nằm trong Grid (full-stretch inside Border) với
+             VerticalAlignment="Center" → centered cứng theo track inner (off
+             by half-pixel của Canvas.Top=3 bị diệt).
+           · Margin.Left = 1.5px bù lại BorderThickness → vị trí ngoài rìa
+             đúng 3px khớp HTML `left:3px`.
+           · IsPressed có ExitActions trả về 14 (vẫn hover) — fix bug knob
+             kẹt ở 17 sau release.
+         ═══════════════════════════════════════════════════════════════════ -->
+    <Style x:Key="BIMUP.Fluent.ToggleSwitch" TargetType="ToggleButton">
+        <Setter Property="FontFamily" Value="{DynamicResource BIMUP.Fluent.Font.Text}" />
+        <Setter Property="FontSize"   Value="14" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Fg1}" />
+        <Setter Property="Cursor"     Value="Hand" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="UseLayoutRounding"   Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <StackPanel Orientation="Horizontal" Background="Transparent">
+                        <Border x:Name="Track"
+                                Width="40" Height="22"
+                                CornerRadius="11"
+                                Background="Transparent"
+                                BorderBrush="{DynamicResource BIMUP.Fluent.Brush.StrokeAccessible}"
+                                BorderThickness="1.5"
+                                VerticalAlignment="Center"
+                                Margin="0,0,12,0"
+                                SnapsToDevicePixels="True">
+                            <!-- Inner grid stretches to track's content rect (đã trừ border).
+                                 Knob anchor Left+Center → Width animate sẽ chỉ mở rộng sang phải. -->
+                            <Grid ClipToBounds="True">
+                                <Border x:Name="Knob"
+                                        Width="12" Height="12"
+                                        CornerRadius="6"
+                                        Background="{DynamicResource BIMUP.Fluent.Brush.Fg2}"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Center"
+                                        Margin="1.5,0,0,0"
+                                        RenderTransformOrigin="0,0.5"
+                                        SnapsToDevicePixels="True">
+                                    <Border.RenderTransform>
+                                        <TranslateTransform X="0" Y="0" />
+                                    </Border.RenderTransform>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <ContentPresenter VerticalAlignment="Center"
+                                          TextElement.Foreground="{TemplateBinding Foreground}"
+                                          TextElement.FontFamily="{TemplateBinding FontFamily}"
+                                          TextElement.FontSize="{TemplateBinding FontSize}" />
+                    </StackPanel>
+                    <ControlTemplate.Triggers>
+                        <!-- Hover squish: width 12 → 14 -->
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Knob" Storyboard.TargetProperty="Width"
+                                                         To="14" Duration="0:0:0.18">
+                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Knob" Storyboard.TargetProperty="Width"
+                                                         To="12" Duration="0:0:0.18" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <!-- Checked: track brand, knob trắng, dịch sang phải 18px (3 → 21) -->
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Track" Property="Background"  Value="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+                            <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+                            <Setter TargetName="Knob"  Property="Background"  Value="#FFFFFFFF" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Knob" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                                         To="18" Duration="0:0:0.20">
+                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Knob" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                                         To="0" Duration="0:0:0.20">
+                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <!-- Pressed: width 17, release → trở về 14 (vẫn hover) -->
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Knob" Storyboard.TargetProperty="Width"
+                                                         To="17" Duration="0:0:0.10" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Knob" Storyboard.TargetProperty="Width"
+                                                         To="14" Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                            <Setter Property="Cursor"  Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Slider — rail 4px + fill accent + thumb 20px white với inner dot
+         ═══════════════════════════════════════════════════════════════════ -->
+    <Style x:Key="BIMUP.Fluent.Slider.Thumb" TargetType="Thumb">
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Cursor"    Value="Hand" />
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Grid Width="20" Height="20">
+                        <Ellipse Fill="#FFFFFFFF"
+                                 Stroke="{DynamicResource BIMUP.Fluent.Brush.Stroke2}"
+                                 StrokeThickness="1"
+                                 Effect="{DynamicResource BIMUP.Fluent.Shadow.4}" />
+                        <Ellipse x:Name="InnerDot"
+                                 Width="10" Height="10"
+                                 Fill="{DynamicResource BIMUP.Fluent.Brush.Accent}"
+                                 RenderTransformOrigin="0.5,0.5">
+                            <Ellipse.RenderTransform>
+                                <ScaleTransform ScaleX="1" ScaleY="1" />
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="InnerDot" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.15" Duration="0:0:0.12" />
+                                        <DoubleAnimation Storyboard.TargetName="InnerDot" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.15" Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="InnerDot" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1" Duration="0:0:0.12" />
+                                        <DoubleAnimation Storyboard.TargetName="InnerDot" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1" Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="InnerDot" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="0.85" Duration="0:0:0.10" />
+                                        <DoubleAnimation Storyboard.TargetName="InnerDot" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="0.85" Duration="0:0:0.10" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="BIMUP.Fluent.Slider" TargetType="Slider">
+        <Setter Property="Height"     Value="32" />
+        <Setter Property="MinWidth"   Value="100" />
+        <Setter Property="Minimum"    Value="0" />
+        <Setter Property="Maximum"    Value="100" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="IsMoveToPointEnabled" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid Height="32" VerticalAlignment="Center">
+                        <!-- Rail 4px (45% opacity) -->
+                        <Border Height="4"
+                                CornerRadius="2"
+                                Background="{DynamicResource BIMUP.Fluent.Brush.StrokeAccessible}"
+                                Opacity="0.45"
+                                VerticalAlignment="Center" />
+                        <Track x:Name="PART_Track">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="Slider.DecreaseLarge">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="RepeatButton">
+                                            <Border Height="4"
+                                                    VerticalAlignment="Center"
+                                                    CornerRadius="2"
+                                                    Background="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.DecreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource BIMUP.Fluent.Slider.Thumb}" />
+                            </Track.Thumb>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="Slider.IncreaseLarge"
+                                              Background="Transparent"
+                                              Opacity="0"
+                                              Focusable="False" />
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

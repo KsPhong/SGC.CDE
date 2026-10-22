@@ -1,0 +1,35 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Override accent default của WPF-UI bằng BIM-UP blue (#0F6CBD).
+         WHY hard-code hex: brush ở đây được instantiate DEFERRED khi control
+         template (vd ui:Button Appearance="Primary") apply. Lúc đó
+         StaticResource ko walk được sang dictionary sibling đã merged →
+         throw "Cannot find resource". Inline hex là source-of-truth giữ
+         single-source: đổi accent → sửa Colors.xaml + file này song song.
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- Fluent accent fill keys -->
+    <SolidColorBrush x:Key="AccentFillColorDefaultBrush"       Color="#FF0F6CBD" />
+    <SolidColorBrush x:Key="AccentFillColorSecondaryBrush"     Color="#FF115EA3" />
+    <SolidColorBrush x:Key="AccentFillColorTertiaryBrush"      Color="#FF0F548C" />
+    <SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="TextOnAccentFillColorSecondaryBrush" Color="#D9FFFFFF" />
+
+    <!-- AccentButton bg (ui:Button Appearance="Primary" thực sự bind tới key này) -->
+    <SolidColorBrush x:Key="AccentButtonBackground"            Color="#FF0F6CBD" />
+    <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="#FF115EA3" />
+    <SolidColorBrush x:Key="AccentButtonBackgroundPressed"     Color="#FF0F548C" />
+    <SolidColorBrush x:Key="AccentButtonForeground"            Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="AccentButtonForegroundPressed"     Color="#D9FFFFFF" />
+
+    <!-- Selection ring / system accent -->
+    <SolidColorBrush x:Key="SystemAccentColorBrush"            Color="#FF0F6CBD" />
+    <SolidColorBrush x:Key="SystemAccentColorLight1Brush"      Color="#FF2B8FE0" />
+    <SolidColorBrush x:Key="SystemAccentColorLight2Brush"      Color="#FF5EA8E5" />
+    <SolidColorBrush x:Key="SystemAccentColorDark1Brush"       Color="#FF115EA3" />
+    <SolidColorBrush x:Key="SystemAccentColorDark2Brush"       Color="#FF0F548C" />
+
+</ResourceDictionary>

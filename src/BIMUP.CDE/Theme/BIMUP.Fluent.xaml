@@ -1,0 +1,47 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+
+    <!-- Chép nguyên từ BIMUP.Revit: BIMUP.Revit/Theme (commit 04b9b6e) để BIMUP MCP Studio cùng giao diện với
+         các cửa sổ BIMUP. Chỉ đổi pack URI sang /BIMUP.CDE;component/. Bản gốc đổi thì chép lại cả thư mục. -->
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         BIMUP.Fluent — master ResourceDictionary (WIN 3.0).
+
+         Đồng bộ 1-1 với HTML reference "BIMUP WIN3 Components". Tất cả token
+         đặt prefix `BIMUP.Fluent.*` để tách biệt khỏi WPF-UI default keys.
+
+         Mỗi nhóm/component nằm 1 file riêng → maintain dễ. Sửa 1 nhóm, mở
+         file con tương ứng trong Theme/ hoặc Theme/Controls/.
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <ResourceDictionary.MergedDictionaries>
+        <!-- 1) WPF-UI base (Light theme + control templates gốc) -->
+        <ui:ThemesDictionary Theme="Light" />
+        <ui:ControlsDictionary />
+
+        <!-- 2) Foundation tokens — phải nạp TRƯỚC Controls/ -->
+        <ResourceDictionary Source="pack://application:,,,/BIMUP.CDE;component/Theme/Colors.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/BIMUP.CDE;component/Theme/AccentOverrides.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/BIMUP.CDE;component/Theme/Tokens.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/BIMUP.CDE;component/Theme/Typography.xaml" />
+
+        <!-- 3) Control styles -->
+        <ResourceDictionary Source="pack://application:,,,/BIMUP.CDE;component/Theme/Controls/Window.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/BIMUP.CDE;component/Theme/Controls/AccentBar.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/BIMUP.CDE;component/Theme/Controls/Card.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/BIMUP.CDE;component/Theme/Controls/Button.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/BIMUP.CDE;component/Theme/Controls/Badge.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/BIMUP.CDE;component/Theme/Controls/TextBox.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/BIMUP.CDE;component/Theme/Controls/ComboBox.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/BIMUP.CDE;component/Theme/Controls/Selection.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/BIMUP.CDE;component/Theme/Controls/InfoBar.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/BIMUP.CDE;component/Theme/Controls/Progress.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/BIMUP.CDE;component/Theme/Controls/Collections.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/BIMUP.CDE;component/Theme/Controls/Expander.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/BIMUP.CDE;component/Theme/Controls/TabControl.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/BIMUP.CDE;component/Theme/Controls/NavigationView.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+
+</ResourceDictionary>
+

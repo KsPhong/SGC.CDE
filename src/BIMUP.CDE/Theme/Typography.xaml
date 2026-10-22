@@ -1,0 +1,123 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         BIMUP Fluent — Type ramp.
+         Đồng bộ 1-1 với .t-* class trong HTML reference:
+             caption 12/16   · body 14/20   · body-strong 14/20 sb
+             body-lg 16/22   · subtitle 20/26 sb -0.01em
+             title 28/36 sb -0.02em   · large 40/50 sb -0.02em
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- WHY DynamicResource cho FontFamily/Brush cross-file: token ở Tokens.xaml /
+         Colors.xaml. StaticResource sẽ fail lúc style apply. -->
+
+    <!-- Default cho mọi TextBlock trong gallery — Segoe UI Variable + Fg1 -->
+    <Style TargetType="TextBlock" x:Key="BIMUP.Fluent.Text.Base">
+        <Setter Property="FontFamily" Value="{DynamicResource BIMUP.Fluent.Font.Text}" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Fg1}" />
+        <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+        <Setter Property="TextOptions.TextRenderingMode"  Value="ClearType" />
+    </Style>
+
+    <!-- Caption 12/16 — phụ chú -->
+    <Style x:Key="BIMUP.Fluent.Text.Caption" TargetType="TextBlock" BasedOn="{StaticResource BIMUP.Fluent.Text.Base}">
+        <Setter Property="FontSize"   Value="12" />
+        <Setter Property="LineHeight" Value="16" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Fg2}" />
+    </Style>
+
+    <!-- Body 14/20 -->
+    <Style x:Key="BIMUP.Fluent.Text.Body" TargetType="TextBlock" BasedOn="{StaticResource BIMUP.Fluent.Text.Base}">
+        <Setter Property="FontSize"   Value="14" />
+        <Setter Property="LineHeight" Value="20" />
+    </Style>
+
+    <!-- Body Strong 14/20 sb -->
+    <Style x:Key="BIMUP.Fluent.Text.BodyStrong" TargetType="TextBlock" BasedOn="{StaticResource BIMUP.Fluent.Text.Base}">
+        <Setter Property="FontSize"   Value="14" />
+        <Setter Property="LineHeight" Value="20" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- Body Large 16/22 -->
+    <Style x:Key="BIMUP.Fluent.Text.BodyLg" TargetType="TextBlock" BasedOn="{StaticResource BIMUP.Fluent.Text.Base}">
+        <Setter Property="FontSize"   Value="16" />
+        <Setter Property="LineHeight" Value="22" />
+    </Style>
+
+    <!-- Subtitle 20/26 sb -0.01em — dùng Display font -->
+    <Style x:Key="BIMUP.Fluent.Text.Subtitle" TargetType="TextBlock" BasedOn="{StaticResource BIMUP.Fluent.Text.Base}">
+        <Setter Property="FontFamily" Value="{DynamicResource BIMUP.Fluent.Font.Display}" />
+        <Setter Property="FontSize"   Value="20" />
+        <Setter Property="LineHeight" Value="26" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <!-- letter-spacing -0.01em ≈ -0.2px ở 20px → -0.2 -->
+    </Style>
+
+    <!-- Title 28/36 sb -0.02em -->
+    <Style x:Key="BIMUP.Fluent.Text.Title" TargetType="TextBlock" BasedOn="{StaticResource BIMUP.Fluent.Text.Base}">
+        <Setter Property="FontFamily" Value="{DynamicResource BIMUP.Fluent.Font.Display}" />
+        <Setter Property="FontSize"   Value="28" />
+        <Setter Property="LineHeight" Value="36" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- Large 40/50 sb -0.02em -->
+    <Style x:Key="BIMUP.Fluent.Text.Large" TargetType="TextBlock" BasedOn="{StaticResource BIMUP.Fluent.Text.Base}">
+        <Setter Property="FontFamily" Value="{DynamicResource BIMUP.Fluent.Font.Display}" />
+        <Setter Property="FontSize"   Value="40" />
+        <Setter Property="LineHeight" Value="50" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- Mono 12 — dùng cho mã, số tabular -->
+    <Style x:Key="BIMUP.Fluent.Text.Mono" TargetType="TextBlock" BasedOn="{StaticResource BIMUP.Fluent.Text.Base}">
+        <Setter Property="FontFamily" Value="{DynamicResource BIMUP.Fluent.Font.Mono}" />
+        <Setter Property="FontSize"   Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Fg3}" />
+    </Style>
+
+    <!-- Eyebrow / Kicker — overline nhỏ trên Heading -->
+    <Style x:Key="BIMUP.Fluent.Text.Eyebrow" TargetType="TextBlock" BasedOn="{StaticResource BIMUP.Fluent.Text.Base}">
+        <Setter Property="FontSize"   Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+        <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+    </Style>
+
+    <!-- Label-sm — UPPERCASE letter trên list/datagrid section -->
+    <Style x:Key="BIMUP.Fluent.Text.LabelSm" TargetType="TextBlock" BasedOn="{StaticResource BIMUP.Fluent.Text.Base}">
+        <Setter Property="FontSize"   Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Fg3}" />
+        <Setter Property="Margin"     Value="0,0,0,10" />
+    </Style>
+
+    <!-- Field label (text trên input) -->
+    <Style x:Key="BIMUP.Fluent.Text.FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource BIMUP.Fluent.Text.Base}">
+        <Setter Property="FontSize"   Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Margin"     Value="0,0,0,6" />
+    </Style>
+
+    <!-- Field hint (text dưới input) -->
+    <Style x:Key="BIMUP.Fluent.Text.FieldHint" TargetType="TextBlock" BasedOn="{StaticResource BIMUP.Fluent.Text.Base}">
+        <Setter Property="FontSize"   Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Fg3}" />
+        <Setter Property="Margin"     Value="0,6,0,0" />
+    </Style>
+
+    <!-- Card head H3 — 15/600 -->
+    <Style x:Key="BIMUP.Fluent.Text.CardHead" TargetType="TextBlock" BasedOn="{StaticResource BIMUP.Fluent.Text.Base}">
+        <Setter Property="FontSize"   Value="15" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style x:Key="BIMUP.Fluent.Text.CardDesc" TargetType="TextBlock" BasedOn="{StaticResource BIMUP.Fluent.Text.Base}">
+        <Setter Property="FontSize"   Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Fg3}" />
+        <Setter Property="Margin"     Value="0,3,0,0" />
+    </Style>
+
+</ResourceDictionary>

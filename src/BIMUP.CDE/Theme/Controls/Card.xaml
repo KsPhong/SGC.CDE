@@ -1,0 +1,37 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Card surfaces. HTML:
+           background: rgba(255,255,255,0.88); border 1px Stroke1; r 10;
+           shadow-2; padding 22x24; hover lifts shadow → shadow-8.
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <Style x:Key="BIMUP.Fluent.Card" TargetType="Border">
+        <Setter Property="Background"      Value="{DynamicResource BIMUP.Fluent.Brush.CardBg}" />
+        <Setter Property="BorderBrush"     Value="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius"    Value="{DynamicResource BIMUP.Fluent.Radius.Card}" />
+        <Setter Property="Padding"         Value="{DynamicResource BIMUP.Fluent.Padding.Card}" />
+        <Setter Property="Margin"          Value="0,0,0,18" />
+        <Setter Property="Effect"          Value="{DynamicResource BIMUP.Fluent.Shadow.2}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <Style x:Key="BIMUP.Fluent.Card.Elevated" TargetType="Border" BasedOn="{StaticResource BIMUP.Fluent.Card}">
+        <Setter Property="Effect" Value="{DynamicResource BIMUP.Fluent.Shadow.8}" />
+    </Style>
+
+    <!-- Card.Section — inset trong dialog (không viền, bg subtle) -->
+    <Style x:Key="BIMUP.Fluent.Card.Section" TargetType="Border">
+        <Setter Property="Background"   Value="{DynamicResource BIMUP.Fluent.Brush.Layer3}" />
+        <Setter Property="CornerRadius" Value="{DynamicResource BIMUP.Fluent.Radius.Control}" />
+        <Setter Property="Padding"      Value="16,12" />
+    </Style>
+
+    <!-- Card head row helper (h3 + desc bên trái, action bên phải) -->
+    <Style x:Key="BIMUP.Fluent.CardHead" TargetType="Grid">
+        <Setter Property="Margin" Value="0,0,0,18" />
+    </Style>
+
+</ResourceDictionary>

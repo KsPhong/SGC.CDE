@@ -1,0 +1,157 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         ListView · TreeView · DataGrid.
+         Tất cả dùng pill indicator 3×60% bên trái khi selected (HTML).
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- ─── ListView container (Border surface) ─── -->
+    <Style x:Key="BIMUP.Fluent.ListView.Surface" TargetType="Border">
+        <Setter Property="Background"      Value="{DynamicResource BIMUP.Fluent.Brush.CtrlRest}" />
+        <Setter Property="BorderBrush"     Value="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius"    Value="{DynamicResource BIMUP.Fluent.Radius.Card}" />
+        <Setter Property="Padding"         Value="5" />
+        <Setter Property="Effect"          Value="{DynamicResource BIMUP.Fluent.Shadow.2}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <!-- ─── ListViewItem (Fluent style với pill 3px khi selected) ─── -->
+    <Style x:Key="BIMUP.Fluent.ListBoxItem" TargetType="ListBoxItem">
+        <Setter Property="FontFamily" Value="{DynamicResource BIMUP.Fluent.Font.Text}" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Fg1}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Padding"    Value="10,8" />
+        <Setter Property="Cursor"     Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment"   Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Grid>
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="{DynamicResource BIMUP.Fluent.Radius.Control}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Border>
+                        <Border x:Name="Pill"
+                                Width="3" Height="0"
+                                CornerRadius="2"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Margin="2,0,0,0"
+                                Background="{DynamicResource BIMUP.Fluent.Brush.Accent}"
+                                Visibility="Collapsed" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.SubtleHover}" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.AccentTint}" />
+                            <Setter TargetName="Pill" Property="Visibility" Value="Visible" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Pill" Storyboard.TargetProperty="Height"
+                                                         From="0" To="24" Duration="0:0:0.20">
+                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ─── ListBox (ItemsControl + scroll) ─── -->
+    <Style x:Key="BIMUP.Fluent.ListBox" TargetType="ListBox">
+        <Setter Property="Background"          Value="Transparent" />
+        <Setter Property="BorderThickness"     Value="0" />
+        <Setter Property="Padding"             Value="0" />
+        <Setter Property="ItemContainerStyle"  Value="{StaticResource BIMUP.Fluent.ListBoxItem}" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         DataGrid Fluent style
+         ═══════════════════════════════════════════════════════════════════ -->
+    <Style x:Key="BIMUP.Fluent.DataGrid" TargetType="DataGrid">
+        <Setter Property="Background"      Value="{DynamicResource BIMUP.Fluent.Brush.CtrlRest}" />
+        <Setter Property="BorderBrush"     Value="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="RowBackground"   Value="Transparent" />
+        <Setter Property="AlternatingRowBackground" Value="Transparent" />
+        <Setter Property="GridLinesVisibility" Value="None" />
+        <Setter Property="HeadersVisibility"   Value="Column" />
+        <Setter Property="AutoGenerateColumns" Value="False" />
+        <Setter Property="CanUserAddRows"      Value="False" />
+        <Setter Property="CanUserDeleteRows"   Value="False" />
+        <Setter Property="CanUserResizeRows"   Value="False" />
+        <Setter Property="SelectionMode"       Value="Single" />
+        <Setter Property="SelectionUnit"       Value="FullRow" />
+        <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" />
+        <Setter Property="VerticalGridLinesBrush"   Value="Transparent" />
+        <Setter Property="FontFamily"      Value="{DynamicResource BIMUP.Fluent.Font.Text}" />
+        <Setter Property="FontSize"        Value="13.5" />
+        <Setter Property="Foreground"      Value="{DynamicResource BIMUP.Fluent.Brush.Fg1}" />
+        <Setter Property="ColumnHeaderHeight" Value="40" />
+        <Setter Property="RowHeight"          Value="44" />
+    </Style>
+
+    <Style x:Key="BIMUP.Fluent.DataGrid.ColumnHeader" TargetType="DataGridColumnHeader">
+        <Setter Property="Background"  Value="{DynamicResource BIMUP.Fluent.Brush.Layer2}" />
+        <Setter Property="Foreground"  Value="{DynamicResource BIMUP.Fluent.Brush.Fg3}" />
+        <Setter Property="FontSize"    Value="11" />
+        <Setter Property="FontWeight"  Value="SemiBold" />
+        <Setter Property="Padding"     Value="16,0" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="VerticalContentAlignment"   Value="Center" />
+    </Style>
+
+    <Style x:Key="BIMUP.Fluent.DataGrid.Row" TargetType="DataGridRow">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Cursor"     Value="Hand" />
+        <Setter Property="FontFamily" Value="{DynamicResource BIMUP.Fluent.Font.Text}" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.SubtleHover}" />
+            </Trigger>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.AccentTint}" />
+                <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Fg1}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="BIMUP.Fluent.DataGrid.Cell" TargetType="DataGridCell">
+        <Setter Property="Padding"           Value="16,0" />
+        <Setter Property="BorderThickness"   Value="0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Background"        Value="Transparent" />
+        <Setter Property="FocusVisualStyle"  Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataGridCell">
+                    <Border Background="{TemplateBinding Background}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter VerticalAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

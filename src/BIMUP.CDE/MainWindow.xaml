@@ -1,0 +1,1067 @@
+<ui:FluentWindow x:Class="BIMUP.CDE.MainWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:local="clr-namespace:BIMUP.CDE"
+                 xmlns:models="clr-namespace:BIMUP.CDE.Models"
+                 Title="BIMUP CDE Studio — Autodesk Construction Cloud"
+                 Width="1480" Height="900" MinWidth="980" MinHeight="640"
+                 ResizeMode="CanResizeWithGrip"
+                 WindowStartupLocation="CenterScreen"
+                 FontFamily="{DynamicResource BIMUP.Fluent.Font.Text}"
+                 Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg1}"
+                 Padding="0,0,0,6"
+                 WindowBackdropType="Mica"
+                 ExtendsContentIntoTitleBar="True">
+
+    <ui:FluentWindow.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolVis" />
+
+        <Style x:Key="Btn.Accent" TargetType="Button" BasedOn="{StaticResource BIMUP.Fluent.Button.Accent}">
+            <Setter Property="Margin" Value="3" />
+        </Style>
+        <Style x:Key="Btn.Outline" TargetType="Button" BasedOn="{StaticResource BIMUP.Fluent.Button.Outline}">
+            <Setter Property="Margin" Value="3" />
+        </Style>
+        <Style x:Key="Btn.Subtle" TargetType="Button" BasedOn="{StaticResource BIMUP.Fluent.Button.Subtle}">
+            <Setter Property="Margin" Value="2" />
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource BIMUP.Fluent.Text.FieldLabel}">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+        </Style>
+        <Style x:Key="Pages" TargetType="TabControl">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid>
+                            <TabPanel IsItemsHost="True" Visibility="Collapsed" />
+                            <ContentPresenter ContentSource="SelectedContent" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </ui:FluentWindow.Resources>
+
+    <Grid Background="{DynamicResource BIMUP.Fluent.Brush.MicaWindow}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ════ Thanh tiêu đề ════ -->
+        <ui:TitleBar Grid.Row="0" Height="42">
+            <ui:TitleBar.Header>
+                <StackPanel Orientation="Horizontal" Margin="14,0,0,0" VerticalAlignment="Center">
+                    <Image Width="20" Height="20" Source="pack://application:,,,/Assets/logo.png" />
+                    <TextBlock Margin="10,0,0,0" VerticalAlignment="Center"
+                               FontFamily="{DynamicResource BIMUP.Fluent.Font.Display}"
+                               FontSize="13" FontWeight="SemiBold"
+                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}"
+                               Text="BIMUP CDE Studio — Autodesk Construction Cloud (ACC)" />
+                </StackPanel>
+            </ui:TitleBar.Header>
+        </ui:TitleBar>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="244" MinWidth="190" MaxWidth="350" />
+                <ColumnDefinition Width="6" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- ════ Thanh điều hướng bên trái (Co giãn được) ════ -->
+            <Border Grid.Column="0" Style="{StaticResource BIMUP.Fluent.Nav.Pane}">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8,4,8,14">
+                        <Image Width="36" Height="36" Source="pack://application:,,,/Assets/logo.png" />
+                        <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="BIMUP.CDE" FontFamily="{DynamicResource BIMUP.Fluent.Font.Display}"
+                                       FontSize="15" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg1}" />
+                            <TextBlock Text="ACC &amp; BIM 360 Explorer" Style="{StaticResource BIMUP.Fluent.Text.Caption}"
+                                       Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg3}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Trạng thái kết nối ACC & MCP ở đáy thanh điều hướng -->
+                    <Border DockPanel.Dock="Bottom" Style="{StaticResource BIMUP.Fluent.Card.Section}" Margin="4,8,4,0">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <Ellipse Width="8" Height="8" Margin="0,0,8,0"
+                                         VerticalAlignment="Center" Fill="{DynamicResource BIMUP.Fluent.Brush.Success}" />
+                                <TextBlock Text="MCP BRIDGE (AI)" Style="{StaticResource BIMUP.Fluent.Text.LabelSm}"
+                                           Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg3}" />
+                            </StackPanel>
+                            <TextBlock x:Name="TxtMcpStatus" Text="Đang chạy (host: cde)"
+                                       Style="{StaticResource BIMUP.Fluent.Text.Caption}" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" Margin="0,0,0,10" />
+
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse x:Name="StatusDot" Width="8" Height="8" Margin="0,0,8,0"
+                                         VerticalAlignment="Center" Fill="{DynamicResource BIMUP.Fluent.Brush.Danger}" />
+                                <TextBlock Text="TRẠNG THÁI ACC API" Style="{StaticResource BIMUP.Fluent.Text.LabelSm}"
+                                           Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg3}" />
+                            </StackPanel>
+                            <TextBlock x:Name="TxtConnectionStatus" Text="Chưa kết nối"
+                                       Style="{StaticResource BIMUP.Fluent.Text.Caption}" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg1}" Margin="0,4,0,8" />
+                            <Button Style="{StaticResource BIMUP.Fluent.Button.Sm}" HorizontalAlignment="Stretch"
+                                    Click="BtnQuickConnect_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="PlugConnected24" FontSize="14" Margin="0,0,6,0" />
+                                    <TextBlock Text="Kết nối ACC ngay" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <ListBox x:Name="NavList" Style="{StaticResource BIMUP.Fluent.Nav.List}"
+                             SelectedIndex="0" SelectionChanged="NavList_SelectionChanged">
+                        <ListBoxItem Tag="Quản lý Cây Thư Mục &amp; File Dự Án">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="FolderOpen24" FontSize="18" Margin="0,0,12,0"
+                                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+                                <TextBlock Text="Thư mục &amp; File Dự án" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem Tag="Thành viên, Role &amp; Phân quyền Thư mục">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="PeopleTeam24" FontSize="18" Margin="0,0,12,0"
+                                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+                                <TextBlock Text="Thành viên &amp; Role" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem Tag="Quy trình Phê duyệt (Workflows) &amp; Đợt trình duyệt (Reviews)">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="CheckmarkStarburst24" FontSize="18" Margin="0,0,12,0"
+                                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+                                <TextBlock Text="Quy trình &amp; Phê duyệt" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem Tag="Vấn đề Dự án (Issues) &amp; Hồ sơ Phát hành (Transmittals)">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Warning24" FontSize="18" Margin="0,0,12,0"
+                                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+                                <TextBlock Text="Issues &amp; Transmittals" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem Tag="Đồng bộ &amp; Sao lưu tự động (Backup)">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="CloudArrowDown24" FontSize="18" Margin="0,0,12,0"
+                                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+                                <TextBlock Text="Đồng bộ &amp; Backup" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem Tag="Cấu hình API &amp; Hướng dẫn mở khóa ACC">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Key24" FontSize="18" Margin="0,0,12,0"
+                                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+                                <TextBlock Text="Cấu hình API" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem Tag="Nhật ký hoạt động">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="DocumentText24" FontSize="18" Margin="0,0,12,0"
+                                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+                                <TextBlock Text="Nhật ký" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </ListBoxItem>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <!-- Thanh kéo co giãn giữa Sidebar và Nội dung chính -->
+            <GridSplitter Grid.Column="1" Style="{StaticResource VerticalSplitter}" />
+
+            <!-- ════ Khu vực Nội dung chính ════ -->
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Header trang -->
+                <Grid Grid.Row="0" Margin="18,6,20,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock x:Name="TxtPageTitle" Text="Quản lý Cây Thư Mục &amp; File Dự Án"
+                                   Style="{StaticResource BIMUP.Fluent.Text.Title}" />
+                        <TextBlock x:Name="TxtProgressStatus"
+                                   Text="Đang kết nối Autodesk Construction Cloud..."
+                                   Style="{StaticResource BIMUP.Fluent.Text.Caption}"
+                                   Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg3}" Margin="0,2,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="BtnCancelTask" Style="{StaticResource Btn.Outline}"
+                                Visibility="Collapsed" Click="BtnCancelTask_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="DismissCircle24" FontSize="15" Margin="0,0,6,0" />
+                                <TextBlock Text="Dừng tác vụ" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Thanh chọn Hub -> Project -> Top Folder dùng chung cho mọi Tab -->
+                <Border Grid.Row="1" Style="{StaticResource BIMUP.Fluent.Card.Section}" Padding="14,8" Margin="18,0,20,8">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                            <TextBlock Text="1. ACC Account (Hub)" Style="{StaticResource FieldLabel}" Margin="3,0,0,2" />
+                            <ComboBox x:Name="CboHubs" SelectionChanged="CboHubs_SelectionChanged" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Margin="4,0,8,0">
+                            <TextBlock Text="2. Dự án (Project)" Style="{StaticResource FieldLabel}" Margin="3,0,0,2" />
+                            <ComboBox x:Name="CboProjects" SelectionChanged="CboProjects_SelectionChanged" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Margin="4,0,8,0">
+                            <TextBlock Text="3. Thư mục gốc (Top Folder)" Style="{StaticResource FieldLabel}" Margin="3,0,0,2" />
+                            <ComboBox x:Name="CboTopFolders" SelectionChanged="CboTopFolders_SelectionChanged" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="3" VerticalAlignment="Bottom">
+                            <Button x:Name="BtnLoadGovernance" Style="{StaticResource Btn.Outline}"
+                                    Padding="13,8" Click="BtnLoadGovernance_Click"
+                                    ToolTip="Tải đồng bộ Roles, Members, Phân quyền, Quy trình &amp; Reviews của dự án này">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="ArrowSync24" FontSize="15" Margin="0,0,6,0" />
+                                    <TextBlock Text="Đồng bộ Role/Quy trình" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="4" VerticalAlignment="Bottom">
+                            <Button x:Name="BtnScanFiles" Style="{StaticResource Btn.Accent}"
+                                    Padding="15,8" Click="BtnScanFiles_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="Search24" FontSize="15" Margin="0,0,8,0" />
+                                    <TextBlock Text="Quét toàn bộ Cây File" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Các Tab nội dung -->
+                <TabControl x:Name="MainTabs" Grid.Row="2" Style="{StaticResource Pages}" SelectedIndex="0" Margin="18,0,20,6">
+
+                    <!-- ═══ TAB 0: EXPLORER CÂY THƯ MỤC & FILE DỰ ÁN ═══ -->
+                    <TabItem>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <!-- Thanh Breadcrumb đường dẫn + Tìm kiếm -->
+                            <Border Grid.Row="0" Style="{StaticResource BIMUP.Fluent.Card.Section}" Padding="14,8" Margin="0,0,0,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="220" />
+                                        <ColumnDefinition Width="165" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Grid.Column="0" Background="{DynamicResource BIMUP.Fluent.Brush.Layer2}"
+                                            BorderBrush="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" BorderThickness="1"
+                                            CornerRadius="6" Padding="10,6" Margin="0,0,10,0" VerticalAlignment="Center">
+                                        <DockPanel>
+                                            <ui:SymbolIcon DockPanel.Dock="Left" Symbol="FolderOpen24" FontSize="16"
+                                                           Foreground="{StaticResource FolderGoldBrush}" Margin="0,0,8,0" />
+                                            <TextBlock x:Name="TxtCurrentBreadcrumb" Text="Project Files"
+                                                       FontWeight="SemiBold" VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </DockPanel>
+                                    </Border>
+
+                                    <TextBox x:Name="TxtSearchFilter" Grid.Column="1"
+                                             ToolTip="Gõ để lọc nhanh theo tên thư mục, tên file, người cập nhật..."
+                                             TextChanged="FilterChanged" />
+
+                                    <ComboBox x:Name="CboExtFilter" Grid.Column="2" SelectedIndex="0"
+                                              SelectionChanged="FilterChanged">
+                                        <ComboBoxItem Content="Tất cả loại (*.*)" />
+                                        <ComboBoxItem Content="Revit (RVT / RFA)" />
+                                        <ComboBoxItem Content="AutoCAD / C3D (DWG)" />
+                                        <ComboBoxItem Content="Navis / IFC (NWD / IFC)" />
+                                        <ComboBoxItem Content="PDF / Office" />
+                                    </ComboBox>
+
+                                    <CheckBox x:Name="ChkCustomAttributes" Grid.Column="3" Margin="8,0,10,0"
+                                              IsChecked="True" Content="Custom Attrs"
+                                              ToolTip="Lấy thêm các trường thuộc tính tùy chỉnh trên ACC Docs" />
+
+                                    <Border Grid.Column="4" Background="{DynamicResource BIMUP.Fluent.Brush.AccentTint}"
+                                            CornerRadius="6" Padding="10,6" VerticalAlignment="Center">
+                                        <TextBlock x:Name="TxtSummaryCount" VerticalAlignment="Center"
+                                                   FontWeight="SemiBold" FontSize="12.5"
+                                                   Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}"
+                                                   Text="0 thư mục  ·  0 files" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+
+                            <!-- ════ KHU VỰC CHÍNH: CÂY THƯ MỤC (TRÁI) <-> KHUNG THƯ MỤC & FILE (PHẢI) — ĐỀU CO KÉO ĐƯỢC ════ -->
+                            <Grid Grid.Row="1" Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="310" MinWidth="200" MaxWidth="620" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" MinWidth="400" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- CỘT TRÁI: CÂY THƯ MỤC DỰ ÁN -->
+                                <Border Grid.Column="0" Style="{StaticResource BIMUP.Fluent.Card.Section}" Padding="8,10">
+                                    <DockPanel>
+                                        <Grid DockPanel.Dock="Top" Margin="6,0,4,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <ui:SymbolIcon Symbol="Folder24" FontSize="16" Foreground="{StaticResource FolderGoldBrush}" Margin="0,0,6,0" />
+                                                <TextBlock Text="CÂY THƯ MỤC DỰ ÁN" Style="{StaticResource BIMUP.Fluent.Text.LabelSm}"
+                                                           Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                                <Button Style="{StaticResource Btn.Subtle}" Padding="6,2"
+                                                        ToolTip="Mở rộng toàn bộ cây thư mục" Click="BtnExpandTree_Click" Content="Mở hết" />
+                                                <Button Style="{StaticResource Btn.Subtle}" Padding="6,2"
+                                                        ToolTip="Thu gọn cây thư mục" Click="BtnCollapseTree_Click" Content="Thu gọn" />
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <TreeView x:Name="TreeFolders" BorderThickness="0" Background="Transparent"
+                                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                                  SelectedItemChanged="TreeFolders_SelectedItemChanged">
+                                            <TreeView.ItemTemplate>
+                                                <HierarchicalDataTemplate DataType="{x:Type models:AccFolder}" ItemsSource="{Binding Children}">
+                                                    <Grid Margin="0,1">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <ui:SymbolIcon Grid.Column="0" Symbol="Folder24" Filled="True" FontSize="17"
+                                                                       Foreground="{StaticResource FolderGoldBrush}"
+                                                                       Margin="0,0,8,0" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding Name}"
+                                                                   VerticalAlignment="Center" FontSize="13"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <Border Grid.Column="2" CornerRadius="9" Padding="6,1" Margin="8,0,2,0"
+                                                                Background="{DynamicResource BIMUP.Fluent.Brush.Layer3}"
+                                                                Visibility="{Binding HasObjects, Converter={StaticResource BoolVis}}"
+                                                                VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding ObjectCount}" FontSize="11" FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg3}" />
+                                                        </Border>
+                                                    </Grid>
+                                                </HierarchicalDataTemplate>
+                                            </TreeView.ItemTemplate>
+                                        </TreeView>
+                                    </DockPanel>
+                                </Border>
+
+                                <!-- Thanh kéo co giãn DỌC -->
+                                <GridSplitter Grid.Column="1" Style="{StaticResource VerticalSplitter}"
+                                              ToolTip="Kéo sang trái/phải để thay đổi độ rộng Cây thư mục" />
+
+                                <!-- CỘT PHẢI: CHIA 2 TẦNG -->
+                                <Grid Grid.Column="2">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition x:Name="RowFoldersPane" Height="210" MinHeight="85" />
+                                        <RowDefinition Height="8" />
+                                        <RowDefinition x:Name="RowFilesPane" Height="*" MinHeight="130" />
+                                    </Grid.RowDefinitions>
+
+                                    <!-- TẦNG TRÊN: DANH SÁCH THƯ MỤC -->
+                                    <Border Grid.Row="0" Style="{StaticResource BIMUP.Fluent.Card.Section}" Padding="0">
+                                        <DockPanel>
+                                            <Border DockPanel.Dock="Top" Background="{DynamicResource BIMUP.Fluent.Brush.Layer2}"
+                                                    BorderBrush="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" BorderThickness="0,0,0,1"
+                                                    CornerRadius="8,8,0,0" Padding="14,7">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <ui:SymbolIcon Symbol="FolderOpen24" Filled="True" FontSize="16"
+                                                                       Foreground="{StaticResource FolderGoldBrush}" Margin="0,0,8,0" />
+                                                        <TextBlock Text="DANH SÁCH THƯ MỤC (Nhấp đúp vào dòng để mở thư mục con)"
+                                                                   FontSize="12" FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                    <TextBlock x:Name="TxtFolderHeaderCount" Grid.Column="1" FontSize="12" FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg3}" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </Border>
+
+                                            <DataGrid x:Name="GridFolders" BorderThickness="0"
+                                                      MouseDoubleClick="GridFolders_MouseDoubleClick">
+                                                <DataGrid.Columns>
+                                                    <DataGridTemplateColumn Header="TÊN THƯ MỤC" Width="230" SortMemberPath="Name">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate DataType="{x:Type models:AccFolder}">
+                                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                    <ui:SymbolIcon Symbol="Folder24" Filled="True" FontSize="17"
+                                                                                   Foreground="{StaticResource FolderGoldBrush}" Margin="0,0,8,0" />
+                                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                                </StackPanel>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+                                                    <DataGridTextColumn Header="ĐƯỜNG DẪN ĐẦY ĐỦ" Binding="{Binding FullPath}" Width="280" />
+                                                    <DataGridTemplateColumn Header="SỐ MỤC" Width="90" SortMemberPath="ObjectCount">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate DataType="{x:Type models:AccFolder}">
+                                                                <Border CornerRadius="10" Padding="8,2" HorizontalAlignment="Left"
+                                                                        Background="{DynamicResource BIMUP.Fluent.Brush.Layer3}">
+                                                                    <TextBlock Text="{Binding ObjectCount}" FontSize="11.5" FontWeight="SemiBold"
+                                                                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" />
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+                                                    <DataGridTextColumn Header="NGƯỜI TẠO" Binding="{Binding CreateUserName}" Width="140" />
+                                                    <DataGridTextColumn Header="NGÀY TẠO" Binding="{Binding CreateTime}" Width="130" />
+                                                    <DataGridTextColumn Header="NGƯỜI CẬP NHẬT" Binding="{Binding LastModifiedUserName}" Width="140" />
+                                                    <DataGridTextColumn Header="NGÀY CẬP NHẬT" Binding="{Binding LastModifiedTime}" Width="130" />
+                                                    <DataGridTextColumn Header="FOLDER URN / ID" Binding="{Binding Id}" Width="220" />
+                                                </DataGrid.Columns>
+                                            </DataGrid>
+                                        </DockPanel>
+                                    </Border>
+
+                                    <!-- Thanh kéo co giãn NGANG -->
+                                    <GridSplitter Grid.Row="1" Style="{StaticResource HorizontalSplitter}"
+                                                  ToolTip="Kéo lên/xuống để thay đổi chiều cao bảng Thư mục và bảng File" />
+
+                                    <!-- TẦNG DƯỚI: DANH SÁCH FILE CHI TIẾT -->
+                                    <Border Grid.Row="2" Style="{StaticResource BIMUP.Fluent.Card.Section}" Padding="0">
+                                        <DockPanel>
+                                            <Border DockPanel.Dock="Top" Background="{DynamicResource BIMUP.Fluent.Brush.Layer2}"
+                                                    BorderBrush="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" BorderThickness="0,0,0,1"
+                                                    CornerRadius="8,8,0,0" Padding="14,7">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <ui:SymbolIcon Symbol="Document24" FontSize="16"
+                                                                       Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" Margin="0,0,8,0" />
+                                                        <TextBlock Text="DANH SÁCH FILE &amp; PHIÊN BẢN (ITEMS &amp; VERSIONS)"
+                                                                   FontSize="12" FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                    <TextBlock x:Name="TxtFileHeaderCount" Grid.Column="1" FontSize="12" FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg3}" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </Border>
+
+                                            <DataGrid x:Name="GridFiles" BorderThickness="0" IsReadOnly="False">
+                                                <DataGrid.Columns>
+                                                    <DataGridCheckBoxColumn Header="CHỌN" Binding="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" Width="58" />
+                                                    <DataGridTemplateColumn Header="TÊN FILE" Width="250" SortMemberPath="FileName" IsReadOnly="True">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate DataType="{x:Type models:AccFileItem}">
+                                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                    <ui:SymbolIcon Symbol="DocumentText24" FontSize="16"
+                                                                                   Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" Margin="0,0,8,0" />
+                                                                    <TextBlock Text="{Binding FileName}" FontWeight="SemiBold"
+                                                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                                </StackPanel>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+                                                    <DataGridTemplateColumn Header="LOẠI" Width="78" SortMemberPath="FileType" IsReadOnly="True">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate DataType="{x:Type models:AccFileItem}">
+                                                                <Border CornerRadius="4" Padding="7,2" HorizontalAlignment="Left"
+                                                                        Background="{DynamicResource BIMUP.Fluent.Brush.Layer3}">
+                                                                    <TextBlock Text="{Binding FileType}" FontSize="11" FontWeight="Bold"
+                                                                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg1}" />
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+                                                    <DataGridTemplateColumn Header="VER" Width="68" SortMemberPath="VersionNumber" IsReadOnly="True">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate DataType="{x:Type models:AccFileItem}">
+                                                                <Border CornerRadius="10" Padding="8,2" HorizontalAlignment="Left"
+                                                                        Background="{DynamicResource BIMUP.Fluent.Brush.AccentTint}">
+                                                                    <TextBlock Text="{Binding VersionDisplay}" FontSize="11.5" FontWeight="Bold"
+                                                                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+                                                    <DataGridTextColumn Header="DUNG LƯỢNG" Binding="{Binding SizeDisplay}" IsReadOnly="True" Width="95" />
+                                                    <DataGridTemplateColumn Header="TRẠNG THÁI DUYỆT" Width="130" SortMemberPath="ReviewState" IsReadOnly="True">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate DataType="{x:Type models:AccFileItem}">
+                                                                <Border x:Name="RevBadge" CornerRadius="5" Padding="8,2" HorizontalAlignment="Left"
+                                                                        Background="{DynamicResource BIMUP.Fluent.Brush.Layer3}">
+                                                                    <TextBlock x:Name="RevText" Text="{Binding ReviewState}" FontSize="11" FontWeight="SemiBold"
+                                                                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" />
+                                                                </Border>
+                                                                <DataTemplate.Triggers>
+                                                                    <DataTrigger Binding="{Binding ReviewState}" Value="APPROVED">
+                                                                        <Setter TargetName="RevBadge" Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.SuccessBg}" />
+                                                                        <Setter TargetName="RevText" Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Success}" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding ReviewState}" Value="IN_REVIEW">
+                                                                        <Setter TargetName="RevBadge" Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.WarningBg}" />
+                                                                        <Setter TargetName="RevText" Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Warning}" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding ReviewState}" Value="REJECTED">
+                                                                        <Setter TargetName="RevBadge" Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.DangerBg}" />
+                                                                        <Setter TargetName="RevText" Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Danger}" />
+                                                                    </DataTrigger>
+                                                                </DataTemplate.Triggers>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+                                                    <DataGridTextColumn Header="ĐƯỜNG DẪN THƯ MỤC" Binding="{Binding FolderPath}" IsReadOnly="True" Width="220" />
+                                                    <DataGridTextColumn Header="NGƯỜI CẬP NHẬT" Binding="{Binding LastModifiedUserName}" IsReadOnly="True" Width="145" />
+                                                    <DataGridTextColumn Header="NGÀY CẬP NHẬT" Binding="{Binding LastModifiedTime}" IsReadOnly="True" Width="135" />
+                                                    <DataGridTextColumn Header="CUSTOM ATTRIBUTES" Binding="{Binding CustomAttributesSummary}" IsReadOnly="True" Width="230" />
+                                                    <DataGridTextColumn Header="TRẠNG THÁI TẢI" Binding="{Binding SyncStatus}" IsReadOnly="True" Width="120" />
+                                                </DataGrid.Columns>
+                                            </DataGrid>
+                                        </DockPanel>
+                                    </Border>
+                                </Grid>
+                            </Grid>
+
+                            <!-- Thanh tác vụ dưới đáy Tab 0 -->
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                    <Button Style="{StaticResource Btn.Outline}" Click="BtnSelectAll_Click" Content="Chọn tất cả File" />
+                                    <Button Style="{StaticResource Btn.Outline}" Click="BtnUnselectAll_Click" Content="Bỏ chọn" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                    <Button Style="{StaticResource Btn.Outline}" Click="BtnExportFoldersCsv_Click" Padding="14,8">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="FolderOpen24" FontSize="15" Margin="0,0,8,0" />
+                                            <TextBlock Text="Xuất bảng Thư mục (.CSV)" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Style="{StaticResource Btn.Outline}" Click="BtnDownloadSelected_Click" Padding="14,8">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="ArrowDownload24" FontSize="15" Margin="0,0,8,0" />
+                                            <TextBlock Text="Tải các File đã chọn" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Style="{StaticResource Btn.Accent}" Click="BtnExportCsv_Click" Padding="16,8">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="DocumentTable24" FontSize="15" Margin="0,0,8,0" />
+                                            <TextBlock Text="Xuất bảng File (.CSV)" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- ═══ TAB 1: THÀNH VIÊN, ROLE & PHÂN QUYỀN THƯ MỤC ═══ -->
+                    <TabItem>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="8" />
+                                <RowDefinition Height="240" MinHeight="120" />
+                            </Grid.RowDefinitions>
+
+                            <!-- Thanh công cụ lọc Thành viên & Role -->
+                            <Border Grid.Row="0" Style="{StaticResource BIMUP.Fluent.Card.Section}" Padding="14,8" Margin="0,0,0,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="TxtMemberSearch" Grid.Column="0"
+                                             ToolTip="Tìm nhanh theo tên Role, tên Thành viên, Email, Công ty, Thư mục..."
+                                             TextChanged="TxtMemberSearch_TextChanged" />
+                                    <Border Grid.Column="1" Background="{DynamicResource BIMUP.Fluent.Brush.AccentTint}"
+                                            CornerRadius="6" Padding="12,6" Margin="8,0" VerticalAlignment="Center">
+                                        <TextBlock x:Name="TxtGovernanceSummary" FontWeight="SemiBold" FontSize="12.5"
+                                                   Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}"
+                                                   Text="0 Roles  ·  0 Thành viên  ·  0 Phân quyền" />
+                                    </Border>
+                                    <Button Grid.Column="2" Style="{StaticResource Btn.Outline}" Padding="14,7"
+                                            Click="BtnScanAllFolderPermissions_Click">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="ShieldKeyhole24" FontSize="15" Margin="0,0,6,0" />
+                                            <TextBlock Text="Quét Phân quyền các Thư mục" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Grid.Column="3" Style="{StaticResource Btn.Accent}" Padding="14,7"
+                                            Click="BtnExportMembersRolesCsv_Click">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="DocumentTable24" FontSize="15" Margin="0,0,6,0" />
+                                            <TextBlock Text="Xuất Role &amp; Member (.CSV)" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                            </Border>
+
+                            <!-- TẦNG TRÊN: ROLES DỰ ÁN (TRÁI) <-> DANH SÁCH THÀNH VIÊN (PHẢI) -->
+                            <Grid Grid.Row="1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="390" MinWidth="240" MaxWidth="650" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" MinWidth="360" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- CỘT TRÁI: BẢNG ROLES CỦA DỰ ÁN -->
+                                <Border Grid.Column="0" Style="{StaticResource BIMUP.Fluent.Card.Section}" Padding="0">
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Top" Background="{DynamicResource BIMUP.Fluent.Brush.Layer2}"
+                                                BorderBrush="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" BorderThickness="0,0,0,1"
+                                                CornerRadius="8,8,0,0" Padding="14,7">
+                                            <StackPanel Orientation="Horizontal">
+                                                <ui:SymbolIcon Symbol="Badge24" FontSize="16"
+                                                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" Margin="0,0,8,0" />
+                                                <TextBlock Text="DANH SÁCH ROLES TRONG DỰ ÁN (INDUSTRY ROLES)"
+                                                           FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Border>
+                                        <DataGrid x:Name="GridRoles" BorderThickness="0">
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="TÊN ROLE / CHỨC DANH" Binding="{Binding Name}" Width="210" FontWeight="SemiBold" />
+                                                <DataGridTextColumn Header="DỊCH VỤ (SERVICES)" Binding="{Binding ServicesSummary}" Width="200" />
+                                                <DataGridTextColumn Header="MEMBER GROUP ID" Binding="{Binding MemberGroupId}" Width="150" />
+                                                <DataGridTextColumn Header="ROLE ID" Binding="{Binding Id}" Width="220" />
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </DockPanel>
+                                </Border>
+
+                                <GridSplitter Grid.Column="1" Style="{StaticResource VerticalSplitter}" />
+
+                                <!-- CỘT PHẢI: BẢNG THÀNH VIÊN DỰ ÁN & HUB -->
+                                <Border Grid.Column="2" Style="{StaticResource BIMUP.Fluent.Card.Section}" Padding="0">
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Top" Background="{DynamicResource BIMUP.Fluent.Brush.Layer2}"
+                                                BorderBrush="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" BorderThickness="0,0,0,1"
+                                                CornerRadius="8,8,0,0" Padding="14,7">
+                                            <StackPanel Orientation="Horizontal">
+                                                <ui:SymbolIcon Symbol="PeopleTeam24" FontSize="16"
+                                                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" Margin="0,0,8,0" />
+                                                <TextBlock Text="DANH SÁCH THÀNH VIÊN DỰ ÁN &amp; TOÀN HUB (PROJECT &amp; ACCOUNT MEMBERS)"
+                                                           FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Border>
+                                        <DataGrid x:Name="GridMembers" BorderThickness="0">
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="PHẠM VI" Binding="{Binding Scope}" Width="90" />
+                                                <DataGridTextColumn Header="HỌ VÀ TÊN" Binding="{Binding Name}" Width="165" FontWeight="SemiBold" />
+                                                <DataGridTextColumn Header="EMAIL" Binding="{Binding Email}" Width="200" />
+                                                <DataGridTextColumn Header="CÔNG TY" Binding="{Binding CompanyName}" Width="150" />
+                                                <DataGridTextColumn Header="ROLES ĐƯỢC GÁN" Binding="{Binding RolesSummary}" Width="220" />
+                                                <DataGridTextColumn Header="CẤP QUYỀN" Binding="{Binding AccessLevel}" Width="135" />
+                                                <DataGridTextColumn Header="TRẠNG THÁI" Binding="{Binding Status}" Width="95" />
+                                                <DataGridTextColumn Header="MODULES / PRODUCTS" Binding="{Binding ProductsSummary}" Width="240" />
+                                                <DataGridTextColumn Header="NGÀY THAM GIA" Binding="{Binding AddedOn}" Width="130" />
+                                                <DataGridTextColumn Header="AUTODESK ID" Binding="{Binding AutodeskId}" Width="150" />
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </DockPanel>
+                                </Border>
+                            </Grid>
+
+                            <GridSplitter Grid.Row="2" Style="{StaticResource HorizontalSplitter}" />
+
+                            <!-- TẦNG DƯỚI: BẢNG PHÂN QUYỀN THƯ MỤC (FOLDER PERMISSIONS) -->
+                            <Border Grid.Row="3" Style="{StaticResource BIMUP.Fluent.Card.Section}" Padding="0">
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Top" Background="{DynamicResource BIMUP.Fluent.Brush.Layer2}"
+                                            BorderBrush="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" BorderThickness="0,0,0,1"
+                                            CornerRadius="8,8,0,0" Padding="14,7">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="ShieldKeyhole24" FontSize="16"
+                                                           Foreground="{StaticResource FolderGoldBrush}" Margin="0,0,8,0" />
+                                            <TextBlock Text="PHÂN QUYỀN TRUY CẬP THƯ MỤC (FOLDER PERMISSIONS — THEO USER / ROLE / CÔNG TY)"
+                                                       FontSize="12" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Border>
+                                    <DataGrid x:Name="GridPermissions" BorderThickness="0">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="ĐƯỜNG DẪN THƯ MỤC" Binding="{Binding FolderPath}" Width="250" FontWeight="SemiBold" />
+                                            <DataGridTextColumn Header="LOẠI ĐỐI TƯỢNG" Binding="{Binding SubjectType}" Width="115" />
+                                            <DataGridTextColumn Header="TÊN ROLE / USER / CÔNG TY" Binding="{Binding SubjectName}" Width="210" FontWeight="SemiBold" />
+                                            <DataGridTextColumn Header="EMAIL / PHÂN LOẠI" Binding="{Binding EmailOrInfo}" Width="190" />
+                                            <DataGridTextColumn Header="MỨC QUYỀN TỔNG HỢP" Binding="{Binding PermissionLevel}" Width="195" />
+                                            <DataGridTextColumn Header="QUYỀN TRỰC TIẾP" Binding="{Binding ActionsSummary}" Width="220" />
+                                            <DataGridTextColumn Header="QUYỀN KẾ THỪA" Binding="{Binding InheritActionsSummary}" Width="220" />
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </DockPanel>
+                            </Border>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- ═══ TAB 2: QUY TRÌNH PHÊ DUYỆT (WORKFLOWS) & CÁC ĐỢT TRÌNH DUYỆT (REVIEWS) ═══ -->
+                    <TabItem>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" MinHeight="160" />
+                                <RowDefinition Height="8" />
+                                <RowDefinition Height="*" MinHeight="160" />
+                            </Grid.RowDefinitions>
+
+                            <!-- Thanh công cụ lọc Quy trình & Reviews -->
+                            <Border Grid.Row="0" Style="{StaticResource BIMUP.Fluent.Card.Section}" Padding="14,8" Margin="0,0,0,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="TxtWorkflowSearch" Grid.Column="0"
+                                             ToolTip="Tìm nhanh theo tên Quy trình, tên Đợt trình duyệt, Role phê duyệt, tên File..."
+                                             TextChanged="TxtWorkflowSearch_TextChanged" />
+                                    <Border Grid.Column="1" Background="{DynamicResource BIMUP.Fluent.Brush.AccentTint}"
+                                            CornerRadius="6" Padding="12,6" Margin="8,0" VerticalAlignment="Center">
+                                        <TextBlock x:Name="TxtWorkflowReviewSummary" FontWeight="SemiBold" FontSize="12.5"
+                                                   Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}"
+                                                   Text="0 Quy trình phê duyệt  ·  0 Đợt trình duyệt (Reviews)" />
+                                    </Border>
+                                    <Button Grid.Column="2" Style="{StaticResource Btn.Accent}" Padding="14,7"
+                                            Click="BtnExportWorkflowsReviewsCsv_Click">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="DocumentTable24" FontSize="15" Margin="0,0,6,0" />
+                                            <TextBlock Text="Xuất Quy trình &amp; Reviews (.CSV)" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                            </Border>
+
+                            <!-- TẦNG TRÊN: BẢNG QUY TRÌNH PHÊ DUYỆT (APPROVAL WORKFLOWS) -->
+                            <Border Grid.Row="1" Style="{StaticResource BIMUP.Fluent.Card.Section}" Padding="0">
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Top" Background="{DynamicResource BIMUP.Fluent.Brush.Layer2}"
+                                            BorderBrush="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" BorderThickness="0,0,0,1"
+                                            CornerRadius="8,8,0,0" Padding="14,7">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="Flow20" FontSize="16"
+                                                           Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" Margin="0,0,8,0" />
+                                            <TextBlock Text="DANH SÁCH QUY TRÌNH PHÊ DUYỆT HỒ SƠ (APPROVAL WORKFLOWS)"
+                                                       FontSize="12" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Border>
+                                    <DataGrid x:Name="GridWorkflows" BorderThickness="0">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="TÊN QUY TRÌNH PHÊ DUYỆT" Binding="{Binding Name}" Width="290" FontWeight="SemiBold" />
+                                            <DataGridTextColumn Header="TRẠNG THÁI" Binding="{Binding Status}" Width="95" />
+                                            <DataGridTextColumn Header="SỐ BƯỚC" Binding="{Binding StepCount}" Width="75" />
+                                            <DataGridTextColumn Header="LUỒNG CÁC BƯỚC DUYỆT (STEPS)" Binding="{Binding StepsSummary}" Width="330" />
+                                            <DataGridTextColumn Header="CÁC ROLE / NGƯỜI THAM GIA TỪNG BƯỚC" Binding="{Binding CandidatesSummary}" Width="360" />
+                                            <DataGridTextColumn Header="KẾT QUẢ PHÊ DUYỆT" Binding="{Binding ApprovalOptionsSummary}" Width="180" />
+                                            <DataGridTextColumn Header="TỰ ĐỘNG COPY FILE" Binding="{Binding CopyFilesInfo}" Width="180" />
+                                            <DataGridTextColumn Header="MÔ TẢ QUY TRÌNH" Binding="{Binding Description}" Width="260" />
+                                            <DataGridTextColumn Header="NGÀY TẠO" Binding="{Binding CreatedAt}" Width="130" />
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </DockPanel>
+                            </Border>
+
+                            <GridSplitter Grid.Row="2" Style="{StaticResource HorizontalSplitter}" />
+
+                            <!-- TẦNG DƯỚI: BẢNG CÁC ĐỢT TRÌNH DUYỆT HỒ SƠ (PROJECT REVIEWS) -->
+                            <Border Grid.Row="3" Style="{StaticResource BIMUP.Fluent.Card.Section}" Padding="0">
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Top" Background="{DynamicResource BIMUP.Fluent.Brush.Layer2}"
+                                            BorderBrush="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" BorderThickness="0,0,0,1"
+                                            CornerRadius="8,8,0,0" Padding="14,7">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="CheckmarkStarburst24" FontSize="16"
+                                                           Foreground="{DynamicResource BIMUP.Fluent.Brush.Success}" Margin="0,0,8,0" />
+                                            <TextBlock Text="DANH SÁCH CÁC ĐỢT TRÌNH DUYỆT HỒ SƠ (REVIEWS &amp; DANH SÁCH FILE ĐÍNH KÈM)"
+                                                       FontSize="12" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Border>
+                                    <DataGrid x:Name="GridReviews" BorderThickness="0">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="#" Binding="{Binding SequenceId}" Width="55" FontWeight="Bold" />
+                                            <DataGridTextColumn Header="TÊN ĐỢT TRÌNH DUYỆT (REVIEW)" Binding="{Binding Name}" Width="310" FontWeight="SemiBold" />
+                                            <DataGridTextColumn Header="TRẠNG THÁI" Binding="{Binding Status}" Width="95" />
+                                            <DataGridTextColumn Header="QUY TRÌNH ÁP DỤNG" Binding="{Binding WorkflowName}" Width="240" />
+                                            <DataGridTextColumn Header="BƯỚC HIỆN TẠI" Binding="{Binding CurrentStepName}" Width="165" />
+                                            <DataGridTextColumn Header="ROLE / NGƯỜI XỬ LÝ TIẾP" Binding="{Binding NextActionBy}" Width="180" />
+                                            <DataGridTextColumn Header="HẠN XỬ LÝ" Binding="{Binding CurrentStepDueDate}" Width="130" />
+                                            <DataGridTextColumn Header="SỐ FILE" Binding="{Binding FilesCount}" Width="75" />
+                                            <DataGridTextColumn Header="DANH SÁCH FILE TRONG ĐỢT DUYỆT" Binding="{Binding FilesSummary}" Width="350" />
+                                            <DataGridTextColumn Header="NGƯỜI TẠO" Binding="{Binding CreatedBy}" Width="145" />
+                                            <DataGridTextColumn Header="NGÀY TẠO" Binding="{Binding CreatedAt}" Width="130" />
+                                            <DataGridTextColumn Header="NGÀY KẾT THÚC" Binding="{Binding FinishedAt}" Width="130" />
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </DockPanel>
+                            </Border>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- ═══ TAB 3: ISSUES & HỒ SƠ PHÁT HÀNH (TRANSMITTALS) ═══ -->
+                    <TabItem>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" MinHeight="150" />
+                                <RowDefinition Height="8" />
+                                <RowDefinition Height="*" MinHeight="150" />
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0" Style="{StaticResource BIMUP.Fluent.Card.Section}" Padding="14,8" Margin="0,0,0,8">
+                                <DockPanel>
+                                    <TextBlock x:Name="TxtIssuesNote" DockPanel.Dock="Left" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" TextWrapping="Wrap"
+                                               Text="Danh sách Vấn đề (Issues) và Gói phát hành hồ sơ (Transmittals) của dự án đang chọn." />
+                                </DockPanel>
+                            </Border>
+
+                            <!-- BẢNG ISSUES -->
+                            <Border Grid.Row="1" Style="{StaticResource BIMUP.Fluent.Card.Section}" Padding="0">
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Top" Background="{DynamicResource BIMUP.Fluent.Brush.Layer2}"
+                                            BorderBrush="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" BorderThickness="0,0,0,1"
+                                            CornerRadius="8,8,0,0" Padding="14,7">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="Warning24" FontSize="16"
+                                                           Foreground="{DynamicResource BIMUP.Fluent.Brush.Warning}" Margin="0,0,8,0" />
+                                            <TextBlock Text="DANH SÁCH VẤN ĐỀ DỰ ÁN (ACC ISSUES)"
+                                                       FontSize="12" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Border>
+                                    <DataGrid x:Name="GridIssues" BorderThickness="0">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="#" Binding="{Binding DisplayId}" Width="60" FontWeight="Bold" />
+                                            <DataGridTextColumn Header="TIÊU ĐỀ ISSUE" Binding="{Binding Title}" Width="260" FontWeight="SemiBold" />
+                                            <DataGridTextColumn Header="TRẠNG THÁI" Binding="{Binding Status}" Width="110" />
+                                            <DataGridTextColumn Header="MÔ TẢ CHI TIẾT" Binding="{Binding Description}" Width="260" />
+                                            <DataGridTextColumn Header="GIAO CHO" Binding="{Binding AssignedTo}" Width="160" />
+                                            <DataGridTextColumn Header="HẠN XỬ LÝ" Binding="{Binding DueDate}" Width="120" />
+                                            <DataGridTextColumn Header="VỊ TRÍ" Binding="{Binding LocationDetails}" Width="180" />
+                                            <DataGridTextColumn Header="NGƯỜI TẠO" Binding="{Binding CreatedBy}" Width="140" />
+                                            <DataGridTextColumn Header="NGÀY TẠO" Binding="{Binding CreatedAt}" Width="130" />
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </DockPanel>
+                            </Border>
+
+                            <GridSplitter Grid.Row="2" Style="{StaticResource HorizontalSplitter}" />
+
+                            <!-- BẢNG TRANSMITTALS -->
+                            <Border Grid.Row="3" Style="{StaticResource BIMUP.Fluent.Card.Section}" Padding="0">
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Top" Background="{DynamicResource BIMUP.Fluent.Brush.Layer2}"
+                                            BorderBrush="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" BorderThickness="0,0,0,1"
+                                            CornerRadius="8,8,0,0" Padding="14,7">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="Send24" FontSize="16"
+                                                           Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" Margin="0,0,8,0" />
+                                            <TextBlock Text="DANH SÁCH HỒ SƠ PHÁT HÀNH (ACC TRANSMITTALS)"
+                                                       FontSize="12" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Border>
+                                    <DataGrid x:Name="GridTransmittals" BorderThickness="0">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="#" Binding="{Binding SequenceId}" Width="60" FontWeight="Bold" />
+                                            <DataGridTextColumn Header="TIÊU ĐỀ GÓI PHÁT HÀNH" Binding="{Binding Title}" Width="320" FontWeight="SemiBold" />
+                                            <DataGridTextColumn Header="TRẠNG THÁI" Binding="{Binding Status}" Width="120" />
+                                            <DataGridTextColumn Header="SỐ TÀI LIỆU" Binding="{Binding DocsCount}" Width="100" />
+                                            <DataGridTextColumn Header="NGƯỜI GỬI" Binding="{Binding CreatedBy}" Width="180" />
+                                            <DataGridTextColumn Header="NGÀY GỬI" Binding="{Binding CreatedAt}" Width="150" />
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </DockPanel>
+                            </Border>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- ═══ TAB 4: ĐỒNG BỘ & BACKUP TỰ ĐỘNG ═══ -->
+                    <TabItem>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <Border Style="{StaticResource BIMUP.Fluent.Card.Section}" Margin="0,0,0,12">
+                                    <StackPanel>
+                                        <TextBlock Text="Sao lưu &amp; Đồng bộ toàn bộ Dự án ACC về ổ cứng (Incremental Sync)"
+                                                   Style="{StaticResource BIMUP.Fluent.Text.Subtitle}" Margin="0,0,0,6" />
+                                        <TextBlock Text="Tự động tạo cây thư mục trên ổ cứng giống hệt trên Autodesk Construction Cloud và chỉ tải về những file mới hoặc có Version mới hơn."
+                                                   Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg3}" TextWrapping="Wrap" Margin="0,0,0,14" />
+
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="180" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Thư mục lưu Backup:" Style="{StaticResource FieldLabel}" />
+                                            <TextBox x:Name="TxtBackupFolder" Grid.Column="1" Text="D:\ACC_Backup" />
+                                            <Button Grid.Column="2" Style="{StaticResource Btn.Outline}"
+                                                    Content="Mở thư mục" Click="BtnOpenBackupFolder_Click" />
+                                        </Grid>
+
+                                        <CheckBox x:Name="ChkIncrementalSync" IsChecked="True" Margin="0,8,0,12"
+                                                  Content="Chỉ tải các file chưa có trên máy hoặc đã thay đổi dung lượng/Version (Incremental Sync)" />
+
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Style="{StaticResource Btn.Accent}" Padding="18,9" Click="BtnStartBackupSync_Click">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ui:SymbolIcon Symbol="CloudArrowDown24" FontSize="17" Margin="0,0,8,0" />
+                                                    <TextBlock Text="Bắt đầu Đồng bộ các File đang chọn về ổ cứng" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- ═══ TAB 5: CẤU HÌNH API & HƯỚNG DẪN MỞ ACC ═══ -->
+                    <TabItem>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <Border Style="{StaticResource BIMUP.Fluent.Card.Section}" Margin="0,0,0,14">
+                                    <StackPanel>
+                                        <TextBlock Text="Thông tin xác thực Autodesk Platform Services (APS)"
+                                                   Style="{StaticResource BIMUP.Fluent.Text.Subtitle}" Margin="0,0,0,12" />
+
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="180" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="APS Client ID:" Style="{StaticResource FieldLabel}" />
+                                            <TextBox x:Name="TxtClientId" Grid.Column="1" />
+                                        </Grid>
+
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="180" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="APS Client Secret:" Style="{StaticResource FieldLabel}" />
+                                            <PasswordBox x:Name="PwdClientSecret" Grid.Column="1" />
+                                        </Grid>
+
+                                        <Grid Margin="0,8,0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="180" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Chế độ xác thực:" Style="{StaticResource FieldLabel}" />
+                                            <CheckBox x:Name="ChkUseThreeLegged" Grid.Column="1"
+                                                      Content="Đăng nhập bằng tài khoản Autodesk cá nhân qua trình duyệt (3-Legged OAuth — dùng khi cần đọc thêm ACC Issues)" />
+                                        </Grid>
+
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="180" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Callback URL (3-Legged):" Style="{StaticResource FieldLabel}" />
+                                            <TextBox x:Name="TxtCallbackUrl" Grid.Column="1" Text="http://localhost:8080/api/auth/callback" />
+                                        </Grid>
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                            <Button Style="{StaticResource Btn.Accent}" Padding="16,8" Click="BtnSaveAndConnect_Click">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ui:SymbolIcon Symbol="CheckmarkCircle24" FontSize="16" Margin="0,0,8,0" />
+                                                    <TextBlock Text="Lưu cấu hình &amp; Kết nối ACC" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Style="{StaticResource Btn.Outline}" Padding="14,8" Click="BtnOpenApsPortal_Click"
+                                                    Content="🌐 Mở cổng APS Developer (Lấy Client ID)" />
+                                            <Button Style="{StaticResource Btn.Outline}" Padding="14,8" Click="BtnOpenAccAdmin_Click"
+                                                    Content="🌐 Mở trang chủ ACC" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Hướng dẫn từng bước ngay trong App -->
+                                <Border Style="{StaticResource BIMUP.Fluent.Card.Section}">
+                                    <StackPanel>
+                                        <TextBlock Text="📖 Hướng dẫn 2 bước mở khóa API trên Autodesk Construction Cloud"
+                                                   Style="{StaticResource BIMUP.Fluent.Text.Subtitle}" Margin="0,0,0,10" />
+
+                                        <TextBlock FontWeight="SemiBold" Margin="0,4,0,4"
+                                                   Text="Bước 1: Tạo App trên cổng Autodesk Platform Services (APS)" />
+                                        <TextBlock Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" TextWrapping="Wrap" Margin="12,0,0,10"
+                                                   Text="1. Truy cập https://aps.autodesk.com/myapps -> Bấm 'Create Application'.&#x0a;2. Chọn loại 'Traditional Web App' (đặt Callback URL là http://localhost:8080/api/auth/callback).&#x0a;3. Bật các API: Data Management API, Autodesk Construction Cloud API, BIM 360 API.&#x0a;4. Copy 'Client ID' và 'Client Secret' dán vào 2 ô ở trên." />
+
+                                        <TextBlock FontWeight="SemiBold" Margin="0,4,0,4"
+                                                   Text="Bước 2: Mở Custom Integrations trong ACC Account Admin" />
+                                        <TextBlock Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg2}" TextWrapping="Wrap" Margin="12,0,0,4"
+                                                   Text="1. Trên trang https://acc.autodesk.com, nhìn góc trên cùng bên trái chuyển từ 'Docs / Project Admin' sang 'Account Admin'.&#x0a;2. Ở thanh menu bên trái của Account Admin, chọn 'Custom Integrations' (hoặc vào 'Apps' -> 'Manage custom integrations').&#x0a;3. Bấm 'Add custom integration' -> Dán mã 'Client ID' vào và lưu lại." />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- ═══ TAB 6: NHẬT KÝ HOẠT ĐỘNG ═══ -->
+                    <TabItem>
+                        <Border Style="{StaticResource BIMUP.Fluent.Card.Section}" Padding="14" VerticalAlignment="Stretch">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                    <Button Style="{StaticResource Btn.Outline}" Content="Sao chép nhật ký" Click="BtnCopyLog_Click" />
+                                    <Button Style="{StaticResource Btn.Outline}" Content="Xóa nhật ký" Click="BtnClearLog_Click" />
+                                </StackPanel>
+                                <TextBox x:Name="TxtLogs" Grid.Row="1" Style="{StaticResource LogTextBox}" />
+                            </Grid>
+                        </Border>
+                    </TabItem>
+                </TabControl>
+
+                <!-- Thanh trạng thái dưới đáy -->
+                <ProgressBar x:Name="ProgressBarMain" Grid.Row="3" Height="4" Margin="18,0,20,0"
+                             Visibility="Collapsed" IsIndeterminate="True" />
+            </Grid>
+        </Grid>
+    </Grid>
+</ui:FluentWindow>

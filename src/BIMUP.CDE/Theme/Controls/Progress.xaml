@@ -1,0 +1,92 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         ProgressBar — determinate + indeterminate.
+         HTML: bar 4px (45% opacity), fill brand, indet 40% bar trượt
+         left -40% → 100% trong 1.6s.
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <Style x:Key="BIMUP.Fluent.ProgressBar" TargetType="ProgressBar">
+        <Setter Property="Height" Value="4" />
+        <Setter Property="Minimum" Value="0" />
+        <Setter Property="Maximum" Value="100" />
+        <Setter Property="Background"  Value="{DynamicResource BIMUP.Fluent.Brush.StrokeAccessible}" />
+        <Setter Property="Foreground"  Value="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid ClipToBounds="True">
+                        <Border x:Name="Track"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="2"
+                                Opacity="0.45" />
+                        <Border x:Name="PART_Indicator"
+                                HorizontalAlignment="Left"
+                                Background="{TemplateBinding Foreground}"
+                                CornerRadius="2" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsIndeterminate" Value="True">
+                            <Setter TargetName="Track" Property="Opacity" Value="0.25" />
+                            <Setter TargetName="PART_Indicator" Property="HorizontalAlignment" Value="Left" />
+                            <Setter TargetName="PART_Indicator" Property="Width" Value="80" />
+                            <Setter TargetName="PART_Indicator" Property="RenderTransform">
+                                <Setter.Value>
+                                    <TranslateTransform X="-80" />
+                                </Setter.Value>
+                            </Setter>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard RepeatBehavior="Forever">
+                                        <DoubleAnimation Storyboard.TargetName="PART_Indicator"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                                         From="-80" To="200"
+                                                         Duration="0:0:1.6">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseInOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Progress Ring (indeterminate spinner). Dùng dạng Visual:
+           <Grid Style="...ProgressRing"> bên trong template tự gồm ellipse + arc.
+         WPF không có ProgressRing native → ta tạo UserControl-free style trên
+         FrameworkElement → đơn giản hơn dùng Border:
+         Cách dùng: <Border Style="...ProgressRing.Spin" Width="40" Height="40" />
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- WHY ui:ProgressRing (không tự dựng + Storyboard):
+         Mọi Storyboard.TargetName trong ControlTemplate.Triggers đều FAIL trên Revit 2027
+         (.NET 10) — kể cả TargetName trỏ UIElement (Grid, Border…) trong template, NameScope
+         strict không resolve được. EventTrigger Loaded fire ngay → văng app.
+         WPF-UI's ProgressRing dùng internal animation (composition-based), không qua
+         Storyboard NameScope → miễn nhiễm bug này. Giữ key cũ để XAML không phải đổi. -->
+    <Style x:Key="BIMUP.Fluent.ProgressRing.Spin" TargetType="ContentControl">
+        <Setter Property="Width"  Value="40" />
+        <Setter Property="Height" Value="40" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContentControl">
+                    <ui:ProgressRing IsIndeterminate="True"
+                                     Width="{TemplateBinding Width}"
+                                     Height="{TemplateBinding Height}"
+                                     Foreground="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

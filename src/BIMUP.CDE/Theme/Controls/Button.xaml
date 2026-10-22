@@ -1,0 +1,413 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Buttons — 5 variant (Accent · Standard · Subtle · Outline · Danger) +
+         Link, Icon, Sm/Lg sizes.
+
+         Mỗi variant viết Template thuần WPF (không qua ui:Button) để
+         press-scale 0.97 + inner-highlight + transition mượt như HTML.
+
+         Cấu trúc Template chung:
+           Outer Border (background / border / radius / shadow)
+             RenderTransform = ScaleTransform (cho press-scale)
+             ContentPresenter (HorizontalContentAlignment = Center)
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- ─── Inner highlight (inset 0 1px 0 rgba(255,255,255,.18)) cho accent ─── -->
+    <LinearGradientBrush x:Key="BIMUP.Fluent.Button.InnerHighlight" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#33FFFFFF" Offset="0" />
+        <GradientStop Color="#00FFFFFF" Offset="0.18" />
+    </LinearGradientBrush>
+
+    <!-- ─── Base — sizing/font, KHÔNG bind background/border (mỗi variant tự set) ─── -->
+    <Style x:Key="BIMUP.Fluent.Button.Base" TargetType="ButtonBase">
+        <Setter Property="Height"     Value="{DynamicResource BIMUP.Fluent.Size.Ctrl}" />
+        <Setter Property="Padding"    Value="{DynamicResource BIMUP.Fluent.Padding.Button}" />
+        <Setter Property="FontFamily" Value="{DynamicResource BIMUP.Fluent.Font.Text}" />
+        <Setter Property="FontSize"   Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Fg1}" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment"   Value="Center" />
+        <Setter Property="Cursor"     Value="Hand" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+    </Style>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         STANDARD button — bg trắng, border subtle, shadow-2
+         ════════════════════════════════════════════════════════════════ -->
+    <Style x:Key="BIMUP.Fluent.Button" TargetType="Button" BasedOn="{StaticResource BIMUP.Fluent.Button.Base}">
+        <Setter Property="Background"  Value="{DynamicResource BIMUP.Fluent.Brush.CtrlRest}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BIMUP.Fluent.Brush.Stroke2}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <!-- WHY animate qua property path (UIElement.RenderTransform).(ScaleTransform.ScaleX):
+                         x:Name trên Freezable (ScaleTransform) KHÔNG được register vào template
+                         NameScope dưới WPF .NET 10 (Revit 2027) → Storyboard throw → văng.
+                         Xem memory wpf-freezable-namescope-rule.md. -->
+                    <Border x:Name="Root"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{DynamicResource BIMUP.Fluent.Radius.Control}"
+                            Effect="{DynamicResource BIMUP.Fluent.Shadow.2}"
+                            RenderTransformOrigin="0.5,0.5"
+                            SnapsToDevicePixels="True">
+                        <Border.RenderTransform>
+                            <ScaleTransform ScaleX="1" ScaleY="1" />
+                        </Border.RenderTransform>
+                        <ContentPresenter x:Name="Cp"
+                                          Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          RecognizesAccessKey="True"
+                                          TextElement.Foreground="{TemplateBinding Foreground}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.CtrlHover}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.CtrlPressed}" />
+                            <Setter TargetName="Root" Property="Effect"     Value="{x:Null}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Root" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="0.97" Duration="0:0:0.10" />
+                                        <DoubleAnimation Storyboard.TargetName="Root" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="0.97" Duration="0:0:0.10" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Root" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1" Duration="0:0:0.12" />
+                                        <DoubleAnimation Storyboard.TargetName="Root" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1" Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Root" Property="Background"  Value="{DynamicResource BIMUP.Fluent.Brush.CtrlDisabled}" />
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" />
+                            <Setter TargetName="Root" Property="Effect"      Value="{x:Null}" />
+                            <Setter Property="Foreground"                    Value="{DynamicResource BIMUP.Fluent.Brush.FgDisabled}" />
+                            <Setter Property="Cursor"                        Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         ACCENT button — fill brand, inner-highlight on top, fg white
+         ════════════════════════════════════════════════════════════════ -->
+    <Style x:Key="BIMUP.Fluent.Button.Accent" TargetType="Button" BasedOn="{StaticResource BIMUP.Fluent.Button.Base}">
+        <Setter Property="Background"  Value="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+        <Setter Property="Foreground"  Value="{DynamicResource BIMUP.Fluent.Brush.FgOnAccent}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <!-- Grid x:Name="ScaleHost" để animate ScaleTransform qua property path
+                         (xem memory wpf-freezable-namescope-rule.md). -->
+                    <Grid x:Name="ScaleHost" RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <ScaleTransform ScaleX="1" ScaleY="1" />
+                        </Grid.RenderTransform>
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="{DynamicResource BIMUP.Fluent.Radius.Control}"
+                                Effect="{DynamicResource BIMUP.Fluent.Shadow.4}"
+                                SnapsToDevicePixels="True" />
+                        <!-- Inner highlight overlay -->
+                        <Border x:Name="Hl"
+                                CornerRadius="{DynamicResource BIMUP.Fluent.Radius.Control}"
+                                Background="{StaticResource BIMUP.Fluent.Button.InnerHighlight}"
+                                IsHitTestVisible="False" />
+                        <ContentPresenter
+                                Margin="{TemplateBinding Padding}"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                RecognizesAccessKey="True"
+                                TextElement.Foreground="{TemplateBinding Foreground}" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.AccentHover}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.AccentPressed}" />
+                            <Setter TargetName="Root" Property="Effect"     Value="{x:Null}" />
+                            <Setter Property="Foreground" Value="#D9FFFFFF" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ScaleHost" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="0.97" Duration="0:0:0.10" />
+                                        <DoubleAnimation Storyboard.TargetName="ScaleHost" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="0.97" Duration="0:0:0.10" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ScaleHost" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1" Duration="0:0:0.12" />
+                                        <DoubleAnimation Storyboard.TargetName="ScaleHost" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1" Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.CtrlDisabled}" />
+                            <Setter TargetName="Root" Property="Effect"     Value="{x:Null}" />
+                            <Setter TargetName="Hl"   Property="Opacity"    Value="0" />
+                            <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.FgDisabled}" />
+                            <Setter Property="Cursor"     Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         SUBTLE button — transparent, hover ink subtle (cho toolbar)
+         ════════════════════════════════════════════════════════════════ -->
+    <Style x:Key="BIMUP.Fluent.Button.Subtle" TargetType="Button" BasedOn="{StaticResource BIMUP.Fluent.Button.Base}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Root"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="{DynamicResource BIMUP.Fluent.Radius.Control}"
+                            RenderTransformOrigin="0.5,0.5"
+                            SnapsToDevicePixels="True">
+                        <Border.RenderTransform>
+                            <ScaleTransform ScaleX="1" ScaleY="1" />
+                        </Border.RenderTransform>
+                        <ContentPresenter
+                                Margin="{TemplateBinding Padding}"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                TextElement.Foreground="{TemplateBinding Foreground}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.SubtleHover}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.SubtlePressed}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.FgDisabled}" />
+                            <Setter Property="Cursor"     Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         OUTLINE button — transparent + visible stroke
+         ════════════════════════════════════════════════════════════════ -->
+    <Style x:Key="BIMUP.Fluent.Button.Outline" TargetType="Button" BasedOn="{StaticResource BIMUP.Fluent.Button.Base}">
+        <Setter Property="Background"      Value="Transparent" />
+        <Setter Property="BorderBrush"     Value="{DynamicResource BIMUP.Fluent.Brush.Stroke2}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Root"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{DynamicResource BIMUP.Fluent.Radius.Control}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter
+                                Margin="{TemplateBinding Padding}"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                TextElement.Foreground="{TemplateBinding Foreground}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.SubtleHover}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.FgDisabled}" />
+                            <Setter Property="Cursor"     Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         DANGER button — fg đỏ, hover bg đỏ nhạt + border đỏ
+         ════════════════════════════════════════════════════════════════ -->
+    <Style x:Key="BIMUP.Fluent.Button.Danger" TargetType="Button" BasedOn="{StaticResource BIMUP.Fluent.Button.Base}">
+        <Setter Property="Background"      Value="{DynamicResource BIMUP.Fluent.Brush.CtrlRest}" />
+        <Setter Property="BorderBrush"     Value="{DynamicResource BIMUP.Fluent.Brush.Stroke2}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground"      Value="{DynamicResource BIMUP.Fluent.Brush.Danger}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Root"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{DynamicResource BIMUP.Fluent.Radius.Control}"
+                            Effect="{DynamicResource BIMUP.Fluent.Shadow.2}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter
+                                Margin="{TemplateBinding Padding}"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                TextElement.Foreground="{TemplateBinding Foreground}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Root" Property="Background"  Value="{DynamicResource BIMUP.Fluent.Brush.DangerBg}" />
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource BIMUP.Fluent.Brush.DangerStroke}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.FgDisabled}" />
+                            <Setter Property="Cursor"     Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         LINK / Hyperlink button — text color accent, hover underline
+         ════════════════════════════════════════════════════════════════ -->
+    <Style x:Key="BIMUP.Fluent.Button.Link" TargetType="Button" BasedOn="{StaticResource BIMUP.Fluent.Button.Base}">
+        <Setter Property="Background"  Value="Transparent" />
+        <Setter Property="Foreground"  Value="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+        <Setter Property="Padding"     Value="4,0" />
+        <Setter Property="Height"      Value="Auto" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <TextBlock x:Name="Tb"
+                               Text="{TemplateBinding Content}"
+                               FontFamily="{TemplateBinding FontFamily}"
+                               FontSize="{TemplateBinding FontSize}"
+                               FontWeight="{TemplateBinding FontWeight}"
+                               Foreground="{TemplateBinding Foreground}"
+                               Background="{TemplateBinding Background}"
+                               Padding="{TemplateBinding Padding}"
+                               VerticalAlignment="Center" />
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Tb" Property="TextDecorations" Value="Underline" />
+                            <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.AccentHover}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ─── Size & icon modifiers ─── -->
+    <Style x:Key="BIMUP.Fluent.Button.Sm" TargetType="Button" BasedOn="{StaticResource BIMUP.Fluent.Button}">
+        <Setter Property="Height"   Value="{DynamicResource BIMUP.Fluent.Size.CtrlSm}" />
+        <Setter Property="Padding"  Value="{DynamicResource BIMUP.Fluent.Padding.ButtonSm}" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style x:Key="BIMUP.Fluent.Button.Lg" TargetType="Button" BasedOn="{StaticResource BIMUP.Fluent.Button}">
+        <Setter Property="Height"   Value="{DynamicResource BIMUP.Fluent.Size.CtrlLg}" />
+        <Setter Property="Padding"  Value="{DynamicResource BIMUP.Fluent.Padding.ButtonLg}" />
+        <Setter Property="FontSize" Value="15" />
+    </Style>
+
+    <!-- Accent sizes -->
+    <Style x:Key="BIMUP.Fluent.Button.Accent.Sm" TargetType="Button" BasedOn="{StaticResource BIMUP.Fluent.Button.Accent}">
+        <Setter Property="Height"   Value="{DynamicResource BIMUP.Fluent.Size.CtrlSm}" />
+        <Setter Property="Padding"  Value="{DynamicResource BIMUP.Fluent.Padding.ButtonSm}" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style x:Key="BIMUP.Fluent.Button.Accent.Lg" TargetType="Button" BasedOn="{StaticResource BIMUP.Fluent.Button.Accent}">
+        <Setter Property="Height"   Value="{DynamicResource BIMUP.Fluent.Size.CtrlLg}" />
+        <Setter Property="Padding"  Value="{DynamicResource BIMUP.Fluent.Padding.ButtonLg}" />
+        <Setter Property="FontSize" Value="15" />
+    </Style>
+
+    <!-- Icon-only square -->
+    <Style x:Key="BIMUP.Fluent.Button.Icon" TargetType="Button" BasedOn="{StaticResource BIMUP.Fluent.Button}">
+        <Setter Property="Width"   Value="{DynamicResource BIMUP.Fluent.Size.Ctrl}" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style x:Key="BIMUP.Fluent.Button.Subtle.Icon" TargetType="Button" BasedOn="{StaticResource BIMUP.Fluent.Button.Subtle}">
+        <Setter Property="Width"   Value="{DynamicResource BIMUP.Fluent.Size.Ctrl}" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style x:Key="BIMUP.Fluent.Button.Accent.Icon" TargetType="Button" BasedOn="{StaticResource BIMUP.Fluent.Button.Accent}">
+        <Setter Property="Width"   Value="{DynamicResource BIMUP.Fluent.Size.Ctrl}" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Segmented control (ToggleButton group). HTML:
+            track Layer3 + border Stroke1 + padding 3, height 30 button,
+            checked: bg #fff + Accent fg + shadow-2
+         ═══════════════════════════════════════════════════════════════ -->
+    <Style x:Key="BIMUP.Fluent.Segmented.Button" TargetType="ToggleButton">
+        <Setter Property="Height"     Value="30" />
+        <Setter Property="MinWidth"   Value="60" />
+        <Setter Property="Padding"    Value="14,0" />
+        <Setter Property="FontFamily" Value="{DynamicResource BIMUP.Fluent.Font.Text}" />
+        <Setter Property="FontSize"   Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Fg2}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Cursor"     Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Root"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="4"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Margin="{TemplateBinding Padding}"
+                                TextElement.Foreground="{TemplateBinding Foreground}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Fg1}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="#FFFFFFFF" />
+                            <Setter TargetName="Root" Property="Effect"     Value="{DynamicResource BIMUP.Fluent.Shadow.2}" />
+                            <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="BIMUP.Fluent.Segmented" TargetType="Border">
+        <Setter Property="Background"      Value="{DynamicResource BIMUP.Fluent.Brush.Layer3}" />
+        <Setter Property="BorderBrush"     Value="{DynamicResource BIMUP.Fluent.Brush.Stroke1}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius"    Value="{DynamicResource BIMUP.Fluent.Radius.Control}" />
+        <Setter Property="Padding"         Value="3" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+
+</ResourceDictionary>

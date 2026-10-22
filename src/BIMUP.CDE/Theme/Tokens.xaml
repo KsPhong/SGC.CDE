@@ -1,0 +1,73 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         BIMUP Fluent — Design tokens (sizing, radius, motion).
+         Đồng bộ 1-1 với :root tokens của HTML reference.
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- ─── Spacing scale ─── -->
+    <sys:Double x:Key="BIMUP.Fluent.Space.1">4</sys:Double>
+    <sys:Double x:Key="BIMUP.Fluent.Space.2">8</sys:Double>
+    <sys:Double x:Key="BIMUP.Fluent.Space.3">12</sys:Double>
+    <sys:Double x:Key="BIMUP.Fluent.Space.4">16</sys:Double>
+    <sys:Double x:Key="BIMUP.Fluent.Space.5">20</sys:Double>
+    <sys:Double x:Key="BIMUP.Fluent.Space.6">24</sys:Double>
+
+    <!-- ─── Corner radius (HTML: 6 / 10 / 8 / 999) ─── -->
+    <CornerRadius x:Key="BIMUP.Fluent.Radius.Control">6</CornerRadius>
+    <CornerRadius x:Key="BIMUP.Fluent.Radius.Card">10</CornerRadius>
+    <CornerRadius x:Key="BIMUP.Fluent.Radius.Flyout">8</CornerRadius>
+    <CornerRadius x:Key="BIMUP.Fluent.Radius.Pill">999</CornerRadius>
+    <CornerRadius x:Key="BIMUP.Fluent.Radius.Sm">4</CornerRadius>
+
+    <!-- Numeric (cho Thumb / Ellipse cần Double, không phải CornerRadius) -->
+    <sys:Double x:Key="BIMUP.Fluent.RadiusN.Control">6</sys:Double>
+    <sys:Double x:Key="BIMUP.Fluent.RadiusN.Card">10</sys:Double>
+
+    <!-- ─── Control sizing (HTML: 28 / 34 / 40) ─── -->
+    <sys:Double x:Key="BIMUP.Fluent.Size.CtrlSm">28</sys:Double>
+    <sys:Double x:Key="BIMUP.Fluent.Size.Ctrl">34</sys:Double>
+    <sys:Double x:Key="BIMUP.Fluent.Size.CtrlLg">40</sys:Double>
+
+    <!-- ─── Padding presets ─── -->
+    <Thickness x:Key="BIMUP.Fluent.Padding.Input">12,0,12,0</Thickness>
+    <Thickness x:Key="BIMUP.Fluent.Padding.Button">16,0,16,0</Thickness>
+    <Thickness x:Key="BIMUP.Fluent.Padding.ButtonSm">12,0,12,0</Thickness>
+    <Thickness x:Key="BIMUP.Fluent.Padding.ButtonLg">22,0,22,0</Thickness>
+    <Thickness x:Key="BIMUP.Fluent.Padding.Card">24,22,24,22</Thickness>
+
+    <!-- ─── Motion · easings (Fluent) ─── -->
+    <!-- WHY KeySpline (control points của cubic-bezier dùng cho Storyboard easing):
+         WPF KeySpline lấy 2 control points (P1, P2) như cubic-bezier(x1,y1,x2,y2)
+         — chỉ có ý nghĩa với Spline*KeyFrame. Ta vẫn để sẵn KeySpline-resource
+         nhưng nhiều control sẽ dùng BezierEase / CubicEase trực tiếp. -->
+    <KeySpline x:Key="BIMUP.Fluent.Spline.Decel"  ControlPoint1="0.1,0.9"  ControlPoint2="0.2,1" />
+    <KeySpline x:Key="BIMUP.Fluent.Spline.Std"    ControlPoint1="0.33,0"   ControlPoint2="0.1,1" />
+    <KeySpline x:Key="BIMUP.Fluent.Spline.Soft"   ControlPoint1="0.16,1"   ControlPoint2="0.3,1" />
+
+    <!-- Durations -->
+    <Duration x:Key="BIMUP.Fluent.Dur.Fast">0:0:0.12</Duration>
+    <Duration x:Key="BIMUP.Fluent.Dur.Norm">0:0:0.20</Duration>
+    <Duration x:Key="BIMUP.Fluent.Dur.Slow">0:0:0.32</Duration>
+
+    <!-- ─── Elevation (shadow ramp) ───
+         WPF DropShadow params: BlurRadius / ShadowDepth / Direction / Opacity.
+         Hex áp xấp xỉ HTML shadow gốc (gộp 2 stack về 1 — DropShadowEffect chỉ 1 lớp). -->
+    <!-- shadow-2:  0 1px 2px rgba(0,0,0,.07) + 0 0 1px rgba(0,0,0,.05) -->
+    <DropShadowEffect x:Key="BIMUP.Fluent.Shadow.2"  BlurRadius="3"  ShadowDepth="1" Direction="270" Opacity="0.10" Color="#000000" />
+    <DropShadowEffect x:Key="BIMUP.Fluent.Shadow.4"  BlurRadius="6"  ShadowDepth="2" Direction="270" Opacity="0.10" Color="#000000" />
+    <DropShadowEffect x:Key="BIMUP.Fluent.Shadow.8"  BlurRadius="12" ShadowDepth="4" Direction="270" Opacity="0.12" Color="#000000" />
+    <DropShadowEffect x:Key="BIMUP.Fluent.Shadow.16" BlurRadius="22" ShadowDepth="8" Direction="270" Opacity="0.14" Color="#000000" />
+    <DropShadowEffect x:Key="BIMUP.Fluent.Shadow.28" BlurRadius="36" ShadowDepth="14" Direction="270" Opacity="0.18" Color="#000000" />
+    <DropShadowEffect x:Key="BIMUP.Fluent.Shadow.64" BlurRadius="64" ShadowDepth="24" Direction="270" Opacity="0.22" Color="#000000" />
+
+    <!-- ─── Font families ─── -->
+    <!-- WHY chuỗi dài: WPF FontFamily fallback chain — nếu Segoe UI Variable Text
+         không có (Win10 cũ) sẽ rơi xuống Segoe UI rồi system Sans. -->
+    <FontFamily x:Key="BIMUP.Fluent.Font.Text">Segoe UI Variable Text, Segoe UI Variable, Segoe UI, Microsoft Sans Serif</FontFamily>
+    <FontFamily x:Key="BIMUP.Fluent.Font.Display">Segoe UI Variable Display, Segoe UI Variable, Segoe UI, Microsoft Sans Serif</FontFamily>
+    <FontFamily x:Key="BIMUP.Fluent.Font.Mono">Cascadia Code, Cascadia Mono, Consolas, Courier New</FontFamily>
+
+</ResourceDictionary>

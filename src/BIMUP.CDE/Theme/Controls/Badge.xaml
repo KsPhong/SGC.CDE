@@ -1,0 +1,102 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Badge — 1-1 với HTML reference:
+            .badge { h22 · pad 0 9 · gap 5 · r-pill · 12/sb · inline-flex }
+            .badge .dot { 6×6 · radius 50% · bg currentColor }
+
+         WPF không có currentColor → mỗi variant có sẵn ContentControl Template
+         tự dựng dot+text. User chỉ cần:
+
+             <ContentControl Style="{StaticResource BIMUP.Fluent.Badge.Success}"
+                             Tag="●"  Content="Đã duyệt" />
+
+         Tag = "●" hoặc "" — có/không chấm dot (5px gap). Không cần Tag dùng
+         <ContentControl ... Content="Mới" />
+
+         Variants: Accent · Success · Warning · Danger · Neutral · Outline
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- ─── Template chung: dot (nếu Tag != "") · text (Content) ─── -->
+    <ControlTemplate x:Key="BIMUP.Fluent.Badge.Template" TargetType="ContentControl">
+        <Border Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}"
+                CornerRadius="{DynamicResource BIMUP.Fluent.Radius.Sm}"
+                Padding="9,0"
+                Height="22"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                SnapsToDevicePixels="True">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Dot: chỉ hiển thị khi Tag được set; Fill = currentColor (Foreground inherit) -->
+                <Ellipse x:Name="Dot"
+                         Width="6" Height="6"
+                         Margin="0,0,5,0"
+                         VerticalAlignment="Center"
+                         Fill="{TemplateBinding Foreground}"
+                         Visibility="Collapsed" />
+                <TextBlock Text="{TemplateBinding Content}"
+                           FontFamily="{TemplateBinding FontFamily}"
+                           FontSize="{TemplateBinding FontSize}"
+                           FontWeight="{TemplateBinding FontWeight}"
+                           Foreground="{TemplateBinding Foreground}"
+                           VerticalAlignment="Center"
+                           TextOptions.TextFormattingMode="Ideal" />
+            </StackPanel>
+        </Border>
+        <ControlTemplate.Triggers>
+            <!-- Trigger trên Tag (string không rỗng) — WPF không trigger "not empty"
+                 nên xài convention: Tag="dot" hoặc Tag="●" — bất cứ giá trị nào sẽ hiển thị -->
+            <Trigger Property="Tag" Value="dot">
+                <Setter TargetName="Dot" Property="Visibility" Value="Visible" />
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+
+    <!-- ─── Base — chung typo, padding, size; Background/Foreground tự đặt ở variant ─── -->
+    <Style x:Key="BIMUP.Fluent.Badge.Base" TargetType="ContentControl">
+        <Setter Property="FontFamily" Value="{DynamicResource BIMUP.Fluent.Font.Text}" />
+        <Setter Property="FontSize"   Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment"   Value="Center" />
+        <Setter Property="Focusable"  Value="False" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template"   Value="{StaticResource BIMUP.Fluent.Badge.Template}" />
+    </Style>
+
+    <Style x:Key="BIMUP.Fluent.Badge.Accent" TargetType="ContentControl" BasedOn="{StaticResource BIMUP.Fluent.Badge.Base}">
+        <Setter Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.Accent}" />
+        <Setter Property="Foreground" Value="#FFFFFFFF" />
+    </Style>
+
+    <Style x:Key="BIMUP.Fluent.Badge.Success" TargetType="ContentControl" BasedOn="{StaticResource BIMUP.Fluent.Badge.Base}">
+        <Setter Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.SuccessBg}" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Success}" />
+    </Style>
+
+    <Style x:Key="BIMUP.Fluent.Badge.Warning" TargetType="ContentControl" BasedOn="{StaticResource BIMUP.Fluent.Badge.Base}">
+        <Setter Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.WarningBg}" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Warning}" />
+    </Style>
+
+    <Style x:Key="BIMUP.Fluent.Badge.Danger" TargetType="ContentControl" BasedOn="{StaticResource BIMUP.Fluent.Badge.Base}">
+        <Setter Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.DangerBg}" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Danger}" />
+    </Style>
+
+    <Style x:Key="BIMUP.Fluent.Badge.Neutral" TargetType="ContentControl" BasedOn="{StaticResource BIMUP.Fluent.Badge.Base}">
+        <Setter Property="Background" Value="{DynamicResource BIMUP.Fluent.Brush.Layer3}" />
+        <Setter Property="Foreground" Value="{DynamicResource BIMUP.Fluent.Brush.Fg2}" />
+    </Style>
+
+    <Style x:Key="BIMUP.Fluent.Badge.Outline" TargetType="ContentControl" BasedOn="{StaticResource BIMUP.Fluent.Badge.Base}">
+        <Setter Property="Background"      Value="Transparent" />
+        <Setter Property="BorderBrush"     Value="{DynamicResource BIMUP.Fluent.Brush.Stroke2}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground"      Value="{DynamicResource BIMUP.Fluent.Brush.Fg2}" />
+    </Style>
+
+</ResourceDictionary>
