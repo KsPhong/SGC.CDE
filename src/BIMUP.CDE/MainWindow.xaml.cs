@@ -1884,8 +1884,8 @@ public partial class MainWindow : FluentWindow
         var editWindow = new Window
         {
             Title = $"Chỉnh sửa bước: {step.Name}",
-            Width = 460,
-            Height = 360,
+            Width = 480,
+            Height = 390,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Owner = this,
             Background = (Brush)FindResource("BIMUP.Fluent.Brush.MicaWindow"),
@@ -1894,12 +1894,14 @@ public partial class MainWindow : FluentWindow
         };
 
         var rootGrid = new Grid { Margin = new Thickness(20) };
-        rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        rootGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 0: Lbl Name
+        rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 1: Txt Name
+        rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 2: Lbl Duration
+        rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 3: Txt Duration
+        rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 4: Lbl Roles
+        rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 5: Txt Roles
+        rootGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // 6: Spacer
+        rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 7: Buttons
 
         // Tên bước
         var lblName = new WpfTextBlock { Text = "Tên bước quy trình:", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 4) };
@@ -1922,20 +1924,21 @@ public partial class MainWindow : FluentWindow
         // Danh sách Role tham gia
         var lblRoles = new WpfTextBlock { Text = "Các Role tham gia (phân cách bằng dấu phẩy):", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 4) };
         Grid.SetRow(lblRoles, 4);
-        var rolesPanel = new StackPanel();
-        rolesPanel.Children.Add(lblRoles);
+        rootGrid.Children.Add(lblRoles);
+
         var txtRoles = new WpfTextBox
         {
             Text = string.Join(", ", step.Roles),
             Height = 32,
+            Margin = new Thickness(0, 0, 0, 12),
             ToolTip = "Ví dụ: 099. BIM, 061. TVTK"
         };
-        rolesPanel.Children.Add(txtRoles);
-        rootGrid.Children.Add(rolesPanel);
+        Grid.SetRow(txtRoles, 5);
+        rootGrid.Children.Add(txtRoles);
 
         // Nút Lưu / Hủy
-        var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0) };
-        Grid.SetRow(btnPanel, 5);
+        var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
+        Grid.SetRow(btnPanel, 7);
 
         var btnCancel = new WpfButton { Content = "Hủy", Width = 80, Height = 30, Margin = new Thickness(0, 0, 8, 0), Style = (Style)FindResource("Btn.Subtle") };
         btnCancel.Click += (s, e) => editWindow.Close();
