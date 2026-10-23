@@ -831,7 +831,9 @@ public partial class MainWindow : FluentWindow
         {
             TxtLogs.AppendText(line);
             TxtLogs.ScrollToEnd();
-            TxtProgressStatus.Text = message;
+            // Dòng phụ dưới tiêu đề chỉ hiện tiến trình cho người dùng; thông điệp kỹ thuật của MCP chỉ ghi vào nhật ký.
+            if (!message.StartsWith("🔌") && !message.StartsWith("🤖"))
+                TxtProgressStatus.Text = message;
         });
     }
 
@@ -839,8 +841,9 @@ public partial class MainWindow : FluentWindow
     {
         ProgressBarMain.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
         BtnCancelTask.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
-        BtnScanFiles.IsEnabled = !busy;
-        BtnLoadGovernance.IsEnabled = !busy;
+        // Chưa kết nối ACC thì các nút quét/đồng bộ luôn tắt.
+        BtnScanFiles.IsEnabled = !busy && _api.IsAuthenticated;
+        BtnLoadGovernance.IsEnabled = !busy && _api.IsAuthenticated;
         if (!string.IsNullOrEmpty(status))
             TxtProgressStatus.Text = status;
     }

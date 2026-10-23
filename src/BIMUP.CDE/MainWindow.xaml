@@ -138,9 +138,6 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="TRẠNG THÁI HỆ THỐNG" Style="{StaticResource BIMUP.Fluent.Text.Eyebrow}" />
-                                <Border Grid.Column="1" Background="{DynamicResource BIMUP.Fluent.Brush.SuccessBg}" CornerRadius="3" Padding="5,1">
-                                    <TextBlock Text="ONLINE" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource BIMUP.Fluent.Brush.Success}" />
-                                </Border>
                             </Grid>
 
                             <Grid Margin="0,2,0,4">
@@ -258,6 +255,8 @@
                                    Text="{Binding SelectedItem.Tag, ElementName=NavList}" />
                         <TextBlock x:Name="TxtProgressStatus"
                                    Text="Sẵn sàng kết nối Autodesk Construction Cloud"
+                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
+                                   TextTrimming="CharacterEllipsis"
                                    FontSize="11.5" Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg3}" Margin="0,3,0,0" />
                     </StackPanel>
 
@@ -269,25 +268,28 @@
                             <StackPanel Orientation="Horizontal" Margin="0,0,8,0" VerticalAlignment="Center">
                                 <TextBlock Text="Hub" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg3}" Margin="0,0,6,0" VerticalAlignment="Center" />
                                 <ComboBox x:Name="CboHubs" Width="135" Height="30" SelectionChanged="CboHubs_SelectionChanged"
-                                          ToolTip="Tài khoản ACC / Hub" />
+                                          IsEnabled="{Binding HasItems, RelativeSource={RelativeSource Self}}"
+                                          ToolTip="Tài khoản ACC / Hub (kết nối ACC để chọn)" />
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,8,0" VerticalAlignment="Center">
                                 <TextBlock Text="Dự án" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg3}" Margin="0,0,6,0" VerticalAlignment="Center" />
                                 <ComboBox x:Name="CboProjects" Width="180" Height="30" SelectionChanged="CboProjects_SelectionChanged"
+                                          IsEnabled="{Binding HasItems, RelativeSource={RelativeSource Self}}"
                                           ToolTip="Dự án ACC đang chọn" />
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,10,0" VerticalAlignment="Center">
                                 <TextBlock Text="Gốc" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg3}" Margin="0,0,6,0" VerticalAlignment="Center" />
                                 <ComboBox x:Name="CboTopFolders" Width="150" Height="30" SelectionChanged="CboTopFolders_SelectionChanged"
+                                          IsEnabled="{Binding HasItems, RelativeSource={RelativeSource Self}}"
                                           ToolTip="Thư mục gốc (Top Folder)" />
                             </StackPanel>
 
                             <!-- Cụm nút hành động dự án -->
                             <Button x:Name="BtnScanFiles" Style="{StaticResource Btn.Accent}"
-                                    Padding="12,0" Height="30" Click="BtnScanFiles_Click"
-                                    ToolTip="Quét cấu trúc cây thư mục và danh sách file">
+                                    Padding="12,0" Height="30" Click="BtnScanFiles_Click" IsEnabled="False"
+                                    ToolTip="Quét cấu trúc cây thư mục và danh sách file (cần kết nối ACC)">
                                 <StackPanel Orientation="Horizontal">
                                     <ui:SymbolIcon Symbol="Search24" FontSize="13" Margin="0,0,6,0" />
                                     <TextBlock Text="Quét Cây File" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -295,8 +297,8 @@
                             </Button>
 
                             <Button x:Name="BtnLoadGovernance" Style="{StaticResource Btn.Outline}"
-                                    Padding="10,0" Height="30" Click="BtnLoadGovernance_Click"
-                                    ToolTip="Đồng bộ thủ công Roles, Members, Quy trình &amp; Reviews">
+                                    Padding="10,0" Height="30" Click="BtnLoadGovernance_Click" IsEnabled="False"
+                                    ToolTip="Đồng bộ thủ công Roles, Members, Quy trình &amp; Reviews (cần kết nối ACC)">
                                 <StackPanel Orientation="Horizontal">
                                     <ui:SymbolIcon Symbol="ArrowSync24" FontSize="13" Margin="0,0,6,0" />
                                     <TextBlock Text="Đồng bộ" VerticalAlignment="Center" />
@@ -351,9 +353,27 @@
                                         </DockPanel>
                                     </Border>
 
-                                    <TextBox x:Name="TxtSearchFilter" Grid.Column="1" Height="30" Margin="0,0,8,0"
-                                             ToolTip="Lọc nhanh tên file, thư mục, người cập nhật..."
-                                             TextChanged="FilterChanged" />
+                                    <Grid Grid.Column="1" Margin="0,0,8,0">
+                                        <TextBox x:Name="TxtSearchFilter" Height="30"
+                                                 ToolTip="Lọc nhanh tên file, thư mục, người cập nhật..."
+                                                 TextChanged="FilterChanged" />
+                                        <!-- Gợi ý khi ô tìm kiếm trống -->
+                                        <TextBlock Text="Tìm file, thư mục..." IsHitTestVisible="False"
+                                                   Margin="10,0,8,0" VerticalAlignment="Center" FontSize="12"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Foreground="{DynamicResource BIMUP.Fluent.Brush.Fg3}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Text, ElementName=TxtSearchFilter}" Value="">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
 
                                     <ComboBox x:Name="CboExtFilter" Grid.Column="2" SelectedIndex="0" Height="30" Margin="0,0,8,0"
                                               SelectionChanged="FilterChanged">
@@ -543,7 +563,7 @@
 
                                             <DataGrid x:Name="GridFiles" BorderThickness="0" IsReadOnly="False" GridLinesVisibility="None">
                                                 <DataGrid.Columns>
-                                                    <DataGridCheckBoxColumn Header="CHỌN" Binding="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" Width="52" />
+                                                    <DataGridCheckBoxColumn Header="CHỌN" Binding="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" MinWidth="64" Width="64" />
                                                     <DataGridTemplateColumn Header="TÊN FILE" Width="260" SortMemberPath="FileName" IsReadOnly="True">
                                                         <DataGridTemplateColumn.CellTemplate>
                                                             <DataTemplate DataType="{x:Type models:AccFileItem}">
