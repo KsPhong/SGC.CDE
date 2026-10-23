@@ -729,13 +729,19 @@ public class AccApiClient
                                 {
                                     foreach (var r in rArr.EnumerateArray())
                                         if (r.TryGetProperty("name", out var rn) && rn.GetString() is string rns && !string.IsNullOrEmpty(rns))
+                                        {
                                             stepObj.Roles.Add(rns);
+                                            RememberCandidateId(stepObj, rns, r);
+                                        }
                                 }
                                 if (candObj.TryGetProperty("users", out var uArr) && uArr.ValueKind == JsonValueKind.Array)
                                 {
                                     foreach (var u in uArr.EnumerateArray())
                                         if (u.TryGetProperty("name", out var un) && un.GetString() is string uns && !string.IsNullOrEmpty(uns))
+                                        {
                                             stepObj.Users.Add(uns);
+                                            RememberCandidateId(stepObj, uns, u);
+                                        }
                                 }
 
                                 var stepCands = ExtractCandidatesNames(candObj);
@@ -996,32 +1002,66 @@ public class AccApiClient
         List<AccWorkflowStepItem> steps,
         bool copyEnabled,
         string? copyTargetFolderUrn,
+        IReadOnlyDictionary<string, string>? roleIdsByName = null,
         CancellationToken ct = default)
     {
         var cleanProjId = CleanId(projectId);
         var xUserId = await ResolveProjectAdminAutodeskIdAsync(cleanProjId, ct);
         var url = $"{BaseUrl}/construction/reviews/v1/projects/{Uri.EscapeDataString(cleanProjId)}/workflows";
 
-        // Lấy danh sách Roles của dự án để map đúng AutodeskId nếu cần
-        // Xây dựng steps payload đúng chuẩn ACC Reviews API
+        var payload = BuildWorkflowPayload(name, description, steps, copyEnabled, copyTargetFolderUrn, roleIdsByName);
+
+        var json = JsonSerializer.Serialize(payload);
+        using var req = new HttpRequestMessage(HttpMethod.Post, url);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+        if (!string.IsNullOrEmpty(xUserId))
+            req.Headers.TryAddWithoutValidation("x-user-id", xUserId);
+        req.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        using var resp = await _http.SendAsync(req, ct);
+        var body = await resp.Content.ReadAsStringAsync(ct);
+        if (!resp.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Lỗi tạo quy trình ({(int)resp.StatusCode}): {body}");
+
+        using var doc = JsonDocument.Parse(body);
+        return doc.RootElement.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? "" : "";
+    }
+
+    /// <summary>
+    /// Dựng payload POST workflows (không gọi mạng) — dùng chung cho tạo thật và chạy thử (dry_run).
+    /// </summary>
+    public static Dictionary<string, object?> BuildWorkflowPayload(
+        string name,
+        string description,
+        List<AccWorkflowStepItem> steps,
+        bool copyEnabled,
+        string? copyTargetFolderUrn,
+        IReadOnlyDictionary<string, string>? roleIdsByName)
+    {
+        // Role/user trong bước chỉ có tên; ACC cần autodeskId. Ưu tiên ID ACC đã trả khi đọc workflow,
+        // role thêm tay thì tra theo ID role của dự án. Không tra được thì báo lỗi, không gửi tên làm ID.
+        string ResolveId(AccWorkflowStepItem s, string name, bool isRole)
+        {
+            if (s.CandidateIds.TryGetValue(name, out var known)) return known;
+            if (isRole && roleIdsByName != null && roleIdsByName.TryGetValue(name, out var rid) && !string.IsNullOrEmpty(rid)) return rid;
+            throw new InvalidOperationException(
+                $"Bước '{s.Name}': không tìm được ID của {(isRole ? "role" : "người dùng")} '{name}'. Kiểm tra lại tên có đúng với danh sách Roles của dự án.");
+        }
+
         var stepsPayload = new List<object>();
         foreach (var s in steps)
         {
-            var roleList = new List<object>();
-            foreach (var r in s.Roles)
-            {
-                // Nếu r là dạng autodeskId số
-                roleList.Add(new { autodeskId = r });
-            }
+            var roleList = s.Roles.Select(r => (object)new { autodeskId = ResolveId(s, r, isRole: true) }).ToList();
+            var userList = s.Users.Select(u => (object)new { autodeskId = ResolveId(s, u, isRole: false) }).ToList();
+
+            var candidates = new Dictionary<string, object> { ["roles"] = roleList };
+            if (userList.Count > 0) candidates["users"] = userList;
 
             var stepObj = new Dictionary<string, object>
             {
                 ["name"] = s.Name,
                 ["type"] = s.Type,
-                ["candidates"] = new Dictionary<string, object>
-                {
-                    ["roles"] = roleList
-                }
+                ["candidates"] = candidates
             };
 
             if (s.Duration > 0)
@@ -1045,28 +1085,13 @@ public class AccApiClient
             copyObj["includeMarkups"] = true;
         }
 
-        var payload = new Dictionary<string, object?>
+        return new Dictionary<string, object?>
         {
             ["name"] = name,
             ["description"] = description,
             ["steps"] = stepsPayload,
             ["copyFilesOptions"] = copyObj
         };
-
-        var json = JsonSerializer.Serialize(payload);
-        using var req = new HttpRequestMessage(HttpMethod.Post, url);
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
-        if (!string.IsNullOrEmpty(xUserId))
-            req.Headers.TryAddWithoutValidation("x-user-id", xUserId);
-        req.Content = new StringContent(json, Encoding.UTF8, "application/json");
-
-        using var resp = await _http.SendAsync(req, ct);
-        var body = await resp.Content.ReadAsStringAsync(ct);
-        if (!resp.IsSuccessStatusCode)
-            throw new InvalidOperationException($"Lỗi tạo quy trình ({(int)resp.StatusCode}): {body}");
-
-        using var doc = JsonDocument.Parse(body);
-        return doc.RootElement.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? "" : "";
     }
 
     /// <summary>
@@ -1266,6 +1291,19 @@ public class AccApiClient
             }
         }
         return (list, null);
+    }
+
+    private static void RememberCandidateId(AccWorkflowStepItem step, string name, JsonElement candidate)
+    {
+        foreach (var key in new[] { "autodeskId", "id" })
+        {
+            if (candidate.TryGetProperty(key, out var el) && el.ValueKind == JsonValueKind.String &&
+                el.GetString() is string id && !string.IsNullOrEmpty(id))
+            {
+                step.CandidateIds[name] = id;
+                return;
+            }
+        }
     }
 
     private static List<string> ExtractCandidatesNames(JsonElement candObj)

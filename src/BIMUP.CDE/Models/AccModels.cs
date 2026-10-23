@@ -15,6 +15,10 @@ public class AccConfig
     public string BackupRootFolder { get; set; } = @"D:\ACC_Backup";
     public bool IncludeCustomAttributes { get; set; } = true;
 
+    // ACC Reviews API không cho sửa/xóa workflow nên việc ẩn chỉ áp dụng trong app.
+    public bool HideSubmitWorkflows { get; set; } = true;
+    public List<string> HiddenWorkflowIds { get; set; } = new();
+
     private static string ConfigPath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BIMUP", "cde_settings.json");
 
@@ -219,6 +223,8 @@ public class AccWorkflowStepItem
     public string DurationLabel => Duration > 0 ? $"{Duration} ngày" : "Không giới hạn";
     public List<string> Roles { get; set; } = new();
     public List<string> Users { get; set; } = new();
+    /// <summary>Tên role/user -> autodeskId do ACC trả về khi đọc workflow (dùng lại khi tạo để không gửi tên vào chỗ ID).</summary>
+    public Dictionary<string, string> CandidateIds { get; } = new(StringComparer.OrdinalIgnoreCase);
     public string CandidatesSummary => string.Join(", ", Roles.Concat(Users));
 }
 

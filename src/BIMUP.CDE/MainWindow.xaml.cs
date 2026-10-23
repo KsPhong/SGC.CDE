@@ -109,12 +109,75 @@ public partial class MainWindow : FluentWindow
         };
     }
 
+    private static readonly HashSet<string> McpNeedsAuth = new(StringComparer.Ordinal)
+    {
+        "list_projects", "select_project"
+    };
+
+    private static readonly HashSet<string> McpNeedsProject = new(StringComparer.Ordinal)
+    {
+        "get_folders", "open_folder", "get_files", "scan_full_project", "get_roles", "get_members",
+        "get_folder_permissions", "get_workflows", "get_reviews", "get_issues", "load_project_governance",
+        "hide_workflow", "unhide_workflow", "export_workflows_json", "create_workflow"
+    };
+
+    /// <summary>Lọc theo name_contains rồi cắt trang theo offset/limit (mặc định 200, tối đa 1000) cho các lệnh đọc.</summary>
+    private static JsonObject McpPage(string countKey, string listKey, JsonArray all, JsonObject args, params string[] searchFields)
+    {
+        var kw = args["name_contains"]?.GetValue<string>();
+        IEnumerable<JsonNode?> q = all;
+        if (!string.IsNullOrWhiteSpace(kw))
+            q = q.Where(n => searchFields.Any(f => (n?[f]?.ToString() ?? "").Contains(kw, StringComparison.OrdinalIgnoreCase)));
+        var matched = q.ToList();
+
+        var offset = Math.Max(0, args["offset"]?.GetValue<int>() ?? 0);
+        var limit = Math.Clamp(args["limit"]?.GetValue<int>() ?? 200, 1, 1000);
+        var page = new JsonArray();
+        foreach (var n in matched.Skip(offset).Take(limit))
+            page.Add(n!.DeepClone());
+
+        return new JsonObject
+        {
+            [countKey] = matched.Count,
+            ["offset"] = offset,
+            ["returned"] = page.Count,
+            [listKey] = page
+        };
+    }
+
+    /// <summary>Chờ (tối đa ~30 giây) tới khi danh sách dự án của Hub đã nạp xong.</summary>
+    private async Task WaitForProjectsAsync(CancellationToken ct)
+    {
+        for (var i = 0; i < 60; i++)
+        {
+            if (await Dispatcher.InvokeAsync(() => CboProjects.ItemsSource is IEnumerable<AccProject> l && l.Any()))
+                return;
+            await Task.Delay(500, ct);
+        }
+    }
+
+    private Dictionary<string, string> RoleIdMap() =>
+        // autodeskId của role trong Reviews API = member_group_id của role (không phải id GUID).
+        _allRoles.Where(r => !string.IsNullOrEmpty(r.MemberGroupId))
+                 .GroupBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
+                 .ToDictionary(g => g.Key, g => g.First().MemberGroupId, StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Thực thi các lệnh MCP gửi trực tiếp từ AI Agent vào BIMUP.CDE.
     /// </summary>
     public async Task<JsonNode> ExecuteMcpCommandAsync(string command, JsonObject args, CancellationToken ct)
     {
         AppendLog($"🤖 [MCP] Nhận lệnh từ AI: {command}");
+
+        // Báo lỗi rõ thay vì trả danh sách rỗng khi chưa kết nối / chưa chọn dự án.
+        if (McpNeedsAuth.Contains(command) || McpNeedsProject.Contains(command))
+        {
+            if (!_api.IsAuthenticated)
+                throw new InvalidOperationException("Chưa kết nối ACC. Gọi lệnh 'connect' trước.");
+            if (McpNeedsProject.Contains(command) &&
+                !await Dispatcher.InvokeAsync(() => CboProjects.SelectedItem != null))
+                throw new InvalidOperationException("Chưa chọn dự án. Gọi 'list_projects' rồi 'select_project'.");
+        }
 
         switch (command)
         {
@@ -147,6 +210,17 @@ public partial class MainWindow : FluentWindow
                 });
             }
 
+            case "connect":
+            {
+                // Dùng lại đúng luồng của nút Kết nối (xác thực bằng Client ID/Secret đã lưu trong cấu hình).
+                await await Dispatcher.InvokeAsync(ConnectAccAsync);
+                if (!_api.IsAuthenticated)
+                    throw new InvalidOperationException("Kết nối ACC thất bại. Xem Nhật ký (get_logs).");
+                // Danh sách dự án được nạp bất đồng bộ sau khi chọn Hub: chờ xong để lệnh sau không gặp danh sách trống.
+                await WaitForProjectsAsync(ct);
+                return await ExecuteMcpCommandAsync("get_status", new JsonObject(), ct);
+            }
+
             case "list_projects":
             {
                 return await Dispatcher.InvokeAsync(() =>
@@ -175,15 +249,18 @@ public partial class MainWindow : FluentWindow
                 AccHub? hub = null;
                 AccProject? targetProj = null;
 
+                await WaitForProjectsAsync(ct);
+
                 await Dispatcher.InvokeAsync(() =>
                 {
                     hub = CboHubs.SelectedItem as AccHub;
                     if (CboProjects.ItemsSource is IEnumerable<AccProject> projs)
                     {
-                        targetProj = projs.FirstOrDefault(p =>
-                            p.Id.Equals(query, StringComparison.OrdinalIgnoreCase) ||
-                            p.Name.Equals(query, StringComparison.OrdinalIgnoreCase) ||
-                            p.Name.Contains(query, StringComparison.OrdinalIgnoreCase));
+                        // Ưu tiên khớp ID, rồi khớp đúng tên, cuối cùng mới "chứa"; tránh chọn nhầm N.DSHCMCG.TC khi tìm N.DSHCMCG.
+                        var list = projs.ToList();
+                        targetProj = list.FirstOrDefault(p => p.Id.Equals(query, StringComparison.OrdinalIgnoreCase))
+                            ?? list.FirstOrDefault(p => p.Name.Equals(query, StringComparison.OrdinalIgnoreCase))
+                            ?? list.FirstOrDefault(p => p.Name.Contains(query, StringComparison.OrdinalIgnoreCase));
                     }
                 });
 
@@ -280,12 +357,9 @@ public partial class MainWindow : FluentWindow
                             ["storage_urn"] = item.StorageUrn
                         });
                     }
-                    return (JsonNode)new JsonObject
-                    {
-                        ["current_path"] = TxtCurrentBreadcrumb.Text,
-                        ["file_count"] = arr.Count,
-                        ["files"] = arr
-                    };
+                    var res = McpPage("file_count", "files", arr, args, "file_name", "folder_path", "file_type");
+                    res["current_path"] = TxtCurrentBreadcrumb.Text;
+                    return (JsonNode)res;
                 });
             }
 
@@ -421,15 +495,19 @@ public partial class MainWindow : FluentWindow
 
             case "get_workflows":
             {
+                var includeHidden = args["include_hidden"]?.GetValue<bool>() ?? false;
                 return await Dispatcher.InvokeAsync(() =>
                 {
                     var arr = new JsonArray();
                     foreach (var w in _allWorkflows)
                     {
+                        var hidden = IsWorkflowHidden(w);
+                        if (hidden && !includeHidden) continue;
                         arr.Add(new JsonObject
                         {
                             ["id"] = w.Id,
                             ["name"] = w.Name,
+                            ["hidden"] = hidden,
                             ["description"] = w.Description,
                             ["status"] = w.Status,
                             ["step_count"] = w.StepCount,
@@ -440,12 +518,164 @@ public partial class MainWindow : FluentWindow
                             ["created_at"] = w.CreatedAt
                         });
                     }
+                    return (JsonNode)McpPage("workflow_count", "workflows", arr, args, "name", "description");
+                });
+            }
+
+            case "hide_workflow":
+            case "unhide_workflow":
+            {
+                var query = args["workflow_id_or_name"]?.GetValue<string>() ?? "";
+                var hide = command == "hide_workflow";
+                return await Dispatcher.InvokeAsync(() =>
+                {
+                    var wf = FindWorkflow(query);
+                    _config.HiddenWorkflowIds.RemoveAll(id => id.Equals(wf.Id, StringComparison.OrdinalIgnoreCase));
+                    if (hide) _config.HiddenWorkflowIds.Add(wf.Id);
+                    _config.Save();
+                    ApplyWorkflowFilter();
                     return (JsonNode)new JsonObject
                     {
-                        ["workflow_count"] = arr.Count,
-                        ["workflows"] = arr
+                        ["workflow_id"] = wf.Id,
+                        ["name"] = wf.Name,
+                        ["hidden"] = IsWorkflowHidden(wf),
+                        ["note"] = "Chỉ ẩn trong SGC CDE; ACC không cho ẩn/xóa workflow qua API."
                     };
                 });
+            }
+
+            case "set_hide_submit_workflows":
+            {
+                var enabled = args["enabled"]?.GetValue<bool>() ?? true;
+                return await Dispatcher.InvokeAsync(() =>
+                {
+                    _config.HideSubmitWorkflows = enabled;
+                    _config.Save();
+                    ApplyWorkflowFilter();
+                    return (JsonNode)new JsonObject
+                    {
+                        ["hide_submit_workflows"] = enabled,
+                        ["visible_workflow_count"] = _filteredWorkflows.Count
+                    };
+                });
+            }
+
+            case "export_workflows_json":
+            {
+                var includeHidden = args["include_hidden"]?.GetValue<bool>() ?? true;
+                var path = args["path"]?.GetValue<string>();
+                return await Dispatcher.InvokeAsync(() =>
+                {
+                    var proj = CboProjects.SelectedItem as AccProject;
+                    var list = _allWorkflows.Where(w => includeHidden || !IsWorkflowHidden(w)).ToList();
+                    if (string.IsNullOrWhiteSpace(path))
+                    {
+                        var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BIMUP", "exports");
+                        Directory.CreateDirectory(dir);
+                        path = Path.Combine(dir, $"Workflows_{CleanFileName(proj?.Name ?? "project")}_{DateTime.Now:yyyyMMdd_HHmmss}.json");
+                    }
+                    var json = System.Text.Json.JsonSerializer.Serialize(list, new System.Text.Json.JsonSerializerOptions
+                    {
+                        WriteIndented = true,
+                        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                    });
+                    File.WriteAllText(path, json, new UTF8Encoding(false));
+                    return (JsonNode)new JsonObject { ["path"] = path, ["workflow_count"] = list.Count };
+                });
+            }
+
+            case "create_workflow":
+            {
+                // Mặc định chạy thử (dry_run=true): dựng đúng payload sẽ gửi nhưng KHÔNG gọi ACC. ACC không cho sửa/xóa workflow qua API.
+                var dryRun = args["dry_run"]?.GetValue<bool>() ?? true;
+                var name = args["name"]?.GetValue<string>()?.Trim() ?? "";
+                if (name.Length == 0) throw new InvalidOperationException("Thiếu tham số 'name'.");
+                var fromQuery = args["from_workflow"]?.GetValue<string>();
+
+                string description = args["description"]?.GetValue<string>() ?? "";
+                bool copyEnabled = args["copy_enabled"]?.GetValue<bool>() ?? false;
+                string? copyUrn = args["copy_target_folder_urn"]?.GetValue<string>();
+                var steps = new List<AccWorkflowStepItem>();
+                AccHub? hub = null;
+                AccProject? proj = null;
+                Dictionary<string, string> roleMap = new();
+
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    hub = CboHubs.SelectedItem as AccHub;
+                    proj = CboProjects.SelectedItem as AccProject;
+                    roleMap = RoleIdMap();
+
+                    if (_allWorkflows.Any(w => w.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                        throw new InvalidOperationException($"Đã có quy trình tên '{name}' (tên phải duy nhất).");
+
+                    if (!string.IsNullOrWhiteSpace(fromQuery))
+                    {
+                        var src = FindWorkflow(fromQuery);
+                        if (args["description"] == null) description = src.Description;
+                        if (args["copy_enabled"] == null) copyEnabled = src.CopyFilesEnabled;
+                        if (args["copy_target_folder_urn"] == null) copyUrn = src.CopyTargetFolderUrn;
+                        foreach (var s in src.Steps)
+                        {
+                            var c = new AccWorkflowStepItem
+                            {
+                                Order = s.Order, Name = s.Name, Type = s.Type,
+                                Duration = s.Duration, DueDateType = s.DueDateType,
+                                Roles = new List<string>(s.Roles), Users = new List<string>(s.Users)
+                            };
+                            foreach (var kv in s.CandidateIds) c.CandidateIds[kv.Key] = kv.Value;
+                            steps.Add(c);
+                        }
+                    }
+                });
+
+                if (args["steps"] is JsonArray stepArr)
+                {
+                    steps.Clear();
+                    foreach (var sn in stepArr.OfType<JsonObject>())
+                    {
+                        var type = (sn["type"]?.GetValue<string>() ?? "").ToUpperInvariant();
+                        if (type is not ("INITIATOR" or "REVIEWER" or "APPROVER"))
+                            throw new InvalidOperationException($"Bước '{sn["name"]}': type phải là INITIATOR, REVIEWER hoặc APPROVER.");
+                        steps.Add(new AccWorkflowStepItem
+                        {
+                            Order = steps.Count + 1,
+                            Name = sn["name"]?.GetValue<string>() ?? "",
+                            Type = type,
+                            Duration = sn["duration"]?.GetValue<int>() ?? 0,
+                            DueDateType = sn["due_date_type"]?.GetValue<string>() ?? "CALENDAR_DAY",
+                            Roles = (sn["roles"] as JsonArray)?.Select(r => r!.GetValue<string>()).ToList() ?? new List<string>()
+                        });
+                    }
+                }
+                if (steps.Count == 0)
+                    throw new InvalidOperationException("Cần 'steps' hoặc 'from_workflow' để biết các bước của quy trình.");
+                if (hub == null || proj == null)
+                    throw new InvalidOperationException("Chưa chọn Hub hoặc Dự án.");
+
+                // Dựng payload (cũng kiểm ID role/user); lỗi tra ID sẽ ném ngay cả khi dry_run.
+                var payload = AccApiClient.BuildWorkflowPayload(name, description, steps, copyEnabled, copyUrn, roleMap);
+                var payloadNode = JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(payload))!;
+
+                if (dryRun)
+                    return new JsonObject
+                    {
+                        ["dry_run"] = true,
+                        ["project"] = proj.Name,
+                        ["note"] = "Chưa tạo gì. Chạy lại với dry_run=false để tạo thật (ACC không cho sửa/xóa workflow qua API).",
+                        ["payload"] = payloadNode
+                    };
+
+                // Chốt chặn: tạo thật phải nêu đúng tên dự án đang chọn (tránh ghi nhầm dự án).
+                var confirm = args["confirm_project"]?.GetValue<string>();
+                if (!string.Equals(confirm, proj.Name, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException(
+                        $"Tạo thật cần 'confirm_project' đúng tên dự án đang chọn. Dự án hiện tại: '{proj.Name}'.");
+
+                var newId = await _api.CreateApprovalWorkflowAsync(proj.Id, name, description, steps, copyEnabled, copyUrn, roleMap, ct);
+                AppendLog($"✅ [MCP] Đã tạo quy trình '{name}' (ID: {newId}) trên dự án {proj.Name}.");
+                await Dispatcher.InvokeAsync(async () => await LoadWorkflowsTabAsync(proj.Id));
+                return new JsonObject { ["created"] = true, ["workflow_id"] = newId, ["name"] = name, ["project"] = proj.Name };
             }
 
             case "get_reviews":
@@ -472,11 +702,7 @@ public partial class MainWindow : FluentWindow
                             ["finished_at"] = r.FinishedAt
                         });
                     }
-                    return (JsonNode)new JsonObject
-                    {
-                        ["review_count"] = arr.Count,
-                        ["reviews"] = arr
-                    };
+                    return (JsonNode)McpPage("review_count", "reviews", arr, args, "name", "workflow_name", "status", "next_action_by");
                 });
             }
 
@@ -513,13 +739,16 @@ public partial class MainWindow : FluentWindow
                             ["created_at"] = t.CreatedAt
                         });
                     }
+                    var issues = McpPage("issue_count", "issues", issArr, args, "title", "status", "assigned_to", "display_id");
+                    var trans = McpPage("transmittal_count", "transmittals", trArr, args, "title", "status", "created_by");
                     return (JsonNode)new JsonObject
                     {
                         ["note"] = TxtIssuesNote.Text,
-                        ["issue_count"] = issArr.Count,
-                        ["issues"] = issArr,
-                        ["transmittal_count"] = trArr.Count,
-                        ["transmittals"] = trArr
+                        ["issue_count"] = issues["issue_count"]!.DeepClone(),
+                        ["issues"] = issues["issues"]!.DeepClone(),
+                        ["transmittal_count"] = trans["transmittal_count"]!.DeepClone(),
+                        ["transmittals"] = trans["transmittals"]!.DeepClone(),
+                        ["offset"] = issues["offset"]!.DeepClone()
                     };
                 });
             }
@@ -1312,11 +1541,25 @@ public partial class MainWindow : FluentWindow
         ApplyWorkflowFilter();
     }
 
+    private static bool IsSubmitWorkflow(AccWorkflow wf) =>
+        wf.Name.Contains("5001") || wf.Name.Contains("5101");
+
+    private bool IsWorkflowHidden(AccWorkflow wf) =>
+        (_config.HideSubmitWorkflows && IsSubmitWorkflow(wf)) ||
+        _config.HiddenWorkflowIds.Contains(wf.Id, StringComparer.OrdinalIgnoreCase);
+
+    private AccWorkflow FindWorkflow(string idOrName) =>
+        _allWorkflows.FirstOrDefault(w => w.Id.Equals(idOrName, StringComparison.OrdinalIgnoreCase))
+        ?? _allWorkflows.FirstOrDefault(w => w.Name.Equals(idOrName, StringComparison.OrdinalIgnoreCase))
+        ?? _allWorkflows.FirstOrDefault(w => w.Name.Contains(idOrName, StringComparison.OrdinalIgnoreCase))
+        ?? throw new InvalidOperationException($"Không tìm thấy quy trình '{idOrName}'.");
+
     private void ApplyWorkflowFilter()
     {
         var kw = TxtWorkflowSearch?.Text.Trim() ?? "";
 
-        IEnumerable<AccWorkflow> wfQuery = _allWorkflows;
+        // Quy trình bị ẩn vẫn nằm trong _allWorkflows để Reviews còn tra được tên.
+        IEnumerable<AccWorkflow> wfQuery = _allWorkflows.Where(w => !IsWorkflowHidden(w));
 
         if (!string.IsNullOrEmpty(kw))
         {
@@ -1925,10 +2168,10 @@ public partial class MainWindow : FluentWindow
         stack.Children.Add(headerDock);
 
         // Luồng hành động rõ ràng: Từ nguồn -> Đích
-        string sourceLabel = wf.Name.Contains("5001") || wf.Name.Contains("5101")
+        string sourceLabel = IsSubmitWorkflow(wf)
             ? "10. Trình Nộp"
             : "15. Chia Sẻ (Shared)";
-        string targetLabel = wf.Name.Contains("5001") || wf.Name.Contains("5101")
+        string targetLabel = IsSubmitWorkflow(wf)
             ? "15. Chia Sẻ (Shared)"
             : "20. Phát Hành (Published)";
 
@@ -2062,7 +2305,8 @@ public partial class MainWindow : FluentWindow
                 wf.Description,
                 wf.Steps,
                 wf.CopyFilesEnabled,
-                wf.CopyTargetFolderUrn);
+                wf.CopyTargetFolderUrn,
+                RoleIdMap());
 
             AppendLog($"✅ Đã lưu quy trình '{wf.Name}' thành công lên ACC! (ID mới: {newId})");
             WpfMessageBox.Show($"Đã lưu quy trình '{wf.Name}' thành công lên Autodesk ACC!", "Thành công", WpfMessageBoxButton.OK, MessageBoxImage.Information);

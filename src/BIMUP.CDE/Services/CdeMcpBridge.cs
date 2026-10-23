@@ -113,12 +113,21 @@ public sealed class CdeMcpBridge : IDisposable
         {
             try
             {
-                var server = new NamedPipeServerStream(
+                // Chỉ tài khoản Windows đang chạy app được mở pipe (tiến trình của user khác trên máy không gọi được).
+                var security = new PipeSecurity();
+                security.AddAccessRule(new PipeAccessRule(
+                    System.Security.Principal.WindowsIdentity.GetCurrent().User!,
+                    PipeAccessRights.ReadWrite | PipeAccessRights.CreateNewInstance,
+                    System.Security.AccessControl.AccessControlType.Allow));
+
+                var server = NamedPipeServerStreamAcl.Create(
                     pipeName,
                     PipeDirection.InOut,
                     NamedPipeServerStream.MaxAllowedServerInstances,
                     PipeTransmissionMode.Byte,
-                    PipeOptions.Asynchronous);
+                    PipeOptions.Asynchronous,
+                    0, 0,
+                    security);
 
                 await server.WaitForConnectionAsync(ct);
                 _ = HandleConnectionAsync(server, requireToken, ct);
@@ -216,6 +225,20 @@ public sealed class CdeMcpBridge : IDisposable
         await pipe.FlushAsync(ct);
     }
 
+    /// <summary>Schema chung cho lệnh đọc có lọc/cắt trang; extra = tham số riêng của lệnh.</summary>
+    private static JsonObject PagingSchema(JsonObject? extra = null)
+    {
+        var props = new JsonObject
+        {
+            ["name_contains"] = new JsonObject { ["type"] = "string", ["description"] = "Chỉ lấy mục có tên/tiêu đề/trạng thái chứa chuỗi này (không phân biệt hoa thường)" },
+            ["limit"] = new JsonObject { ["type"] = "integer", ["description"] = "Số mục tối đa trả về (mặc định 200, tối đa 1000)" },
+            ["offset"] = new JsonObject { ["type"] = "integer", ["description"] = "Bỏ qua N mục đầu (để lấy trang tiếp theo)" }
+        };
+        if (extra != null)
+            foreach (var kv in extra.ToList()) { extra.Remove(kv.Key); props[kv.Key] = kv.Value; }
+        return new JsonObject { ["type"] = "object", ["properties"] = props };
+    }
+
     private static JsonObject BuildCatalog()
     {
         return new JsonObject
@@ -235,6 +258,14 @@ public sealed class CdeMcpBridge : IDisposable
                     ["toolset"] = "explorer",
                     ["description"] = "Lấy trạng thái hiện tại của SGC CDE: Hub đang chọn, Dự án đang chọn, đường dẫn thư mục, số lượng folder/file/role/member/workflow/review.",
                     ["read_only"] = true,
+                    ["input_schema"] = new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }
+                },
+                new JsonObject
+                {
+                    ["name"] = "connect",
+                    ["toolset"] = "explorer",
+                    ["description"] = "Kết nối ACC bằng APS Client ID/Secret đã lưu trong cấu hình (như nút Kết nối), rồi trả trạng thái.",
+                    ["read_only"] = false,
                     ["input_schema"] = new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }
                 },
                 new JsonObject
@@ -289,9 +320,9 @@ public sealed class CdeMcpBridge : IDisposable
                 {
                     ["name"] = "get_files",
                     ["toolset"] = "explorer",
-                    ["description"] = "Lấy danh sách các File (Items & Versions) đang hiển thị trong SGC CDE.",
+                    ["description"] = "Lấy danh sách các File (Items & Versions) đang hiển thị trong SGC CDE. Có name_contains/limit/offset.",
                     ["read_only"] = true,
-                    ["input_schema"] = new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }
+                    ["input_schema"] = PagingSchema()
                 },
                 new JsonObject
                 {
@@ -329,25 +360,133 @@ public sealed class CdeMcpBridge : IDisposable
                 {
                     ["name"] = "get_workflows",
                     ["toolset"] = "governance",
-                    ["description"] = "Lấy toàn bộ các Quy trình phê duyệt hồ sơ (Approval Workflows) của dự án đang chọn.",
+                    ["description"] = "Lấy các Quy trình phê duyệt hồ sơ (Approval Workflows) của dự án đang chọn. Mặc định không trả quy trình đã ẩn.",
                     ["read_only"] = true,
-                    ["input_schema"] = new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }
+                    ["input_schema"] = PagingSchema(new JsonObject
+                    {
+                        ["include_hidden"] = new JsonObject { ["type"] = "boolean", ["description"] = "true = trả cả quy trình đang bị ẩn (mặc định false)" }
+                    })
+                },
+                new JsonObject
+                {
+                    ["name"] = "hide_workflow",
+                    ["toolset"] = "governance",
+                    ["description"] = "Ẩn một Quy trình phê duyệt khỏi SGC CDE (lưu bền trong cde_settings.json). Chỉ ẩn trong app, không đổi gì trên ACC.",
+                    ["read_only"] = false,
+                    ["input_schema"] = new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["workflow_id_or_name"] = new JsonObject { ["type"] = "string", ["description"] = "ID hoặc tên quy trình" }
+                        },
+                        ["required"] = new JsonArray("workflow_id_or_name")
+                    }
+                },
+                new JsonObject
+                {
+                    ["name"] = "unhide_workflow",
+                    ["toolset"] = "governance",
+                    ["description"] = "Bỏ ẩn một Quy trình phê duyệt đã bị ẩn bằng hide_workflow.",
+                    ["read_only"] = false,
+                    ["input_schema"] = new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["workflow_id_or_name"] = new JsonObject { ["type"] = "string", ["description"] = "ID hoặc tên quy trình" }
+                        },
+                        ["required"] = new JsonArray("workflow_id_or_name")
+                    }
+                },
+                new JsonObject
+                {
+                    ["name"] = "set_hide_submit_workflows",
+                    ["toolset"] = "governance",
+                    ["description"] = "Bật/tắt việc ẩn nhóm quy trình Nộp mô hình BIM (5001/5101), chỉ giữ quy trình Phát hành. Mặc định bật.",
+                    ["read_only"] = false,
+                    ["input_schema"] = new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["enabled"] = new JsonObject { ["type"] = "boolean" }
+                        }
+                    }
                 },
                 new JsonObject
                 {
                     ["name"] = "get_reviews",
                     ["toolset"] = "governance",
-                    ["description"] = "Lấy toàn bộ các Đợt trình duyệt hồ sơ (Reviews) kèm danh sách file đính kèm và bước xử lý tiếp theo.",
+                    ["description"] = "Lấy các Đợt trình duyệt hồ sơ (Reviews) kèm danh sách file đính kèm và bước xử lý tiếp theo. Có name_contains/limit/offset.",
                     ["read_only"] = true,
-                    ["input_schema"] = new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }
+                    ["input_schema"] = PagingSchema()
                 },
                 new JsonObject
                 {
                     ["name"] = "get_issues",
                     ["toolset"] = "governance",
-                    ["description"] = "Lấy danh sách Issues (Vấn đề dự án) và Transmittals (Hồ sơ phát hành) của dự án.",
+                    ["description"] = "Lấy danh sách Issues (Vấn đề dự án) và Transmittals (Hồ sơ phát hành) của dự án. Có name_contains/limit/offset (áp cho cả hai danh sách).",
                     ["read_only"] = true,
-                    ["input_schema"] = new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }
+                    ["input_schema"] = PagingSchema()
+                },
+                new JsonObject
+                {
+                    ["name"] = "export_workflows_json",
+                    ["toolset"] = "governance",
+                    ["description"] = "Xuất toàn bộ Quy trình phê duyệt của dự án ra file JSON (dùng làm bản sao lưu trước khi tạo quy trình mới). Mặc định ghi vào %LOCALAPPDATA%\\BIMUP\\exports.",
+                    ["read_only"] = false,
+                    ["input_schema"] = new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["path"] = new JsonObject { ["type"] = "string", ["description"] = "Đường dẫn file .json (bỏ trống = tự đặt tên)" },
+                            ["include_hidden"] = new JsonObject { ["type"] = "boolean", ["description"] = "Gồm cả quy trình đang ẩn (mặc định true)" }
+                        }
+                    }
+                },
+                new JsonObject
+                {
+                    ["name"] = "create_workflow",
+                    ["toolset"] = "governance",
+                    ["description"] = "Tạo Quy trình phê duyệt mới trên ACC từ danh sách bước, hoặc nhân bản từ quy trình có sẵn (from_workflow). " +
+                                      "MẶC ĐỊNH dry_run=true: chỉ trả payload sẽ gửi. ACC KHÔNG cho sửa/xóa workflow qua API nên chỉ đặt dry_run=false khi chắc chắn. Tên phải duy nhất.",
+                    ["read_only"] = false,
+                    ["destructive"] = true,
+                    ["input_schema"] = new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["name"] = new JsonObject { ["type"] = "string", ["description"] = "Tên quy trình mới (duy nhất)" },
+                            ["description"] = new JsonObject { ["type"] = "string" },
+                            ["from_workflow"] = new JsonObject { ["type"] = "string", ["description"] = "ID hoặc tên quy trình nguồn để nhân bản các bước" },
+                            ["steps"] = new JsonObject
+                            {
+                                ["type"] = "array",
+                                ["description"] = "Các bước (bỏ trống nếu dùng from_workflow). Role gọi theo tên như trong danh sách Roles của dự án.",
+                                ["items"] = new JsonObject
+                                {
+                                    ["type"] = "object",
+                                    ["properties"] = new JsonObject
+                                    {
+                                        ["name"] = new JsonObject { ["type"] = "string" },
+                                        ["type"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("INITIATOR", "REVIEWER", "APPROVER") },
+                                        ["duration"] = new JsonObject { ["type"] = "integer", ["description"] = "Số ngày xử lý (0 = không giới hạn)" },
+                                        ["due_date_type"] = new JsonObject { ["type"] = "string", ["description"] = "Mặc định CALENDAR_DAY" },
+                                        ["roles"] = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "string" } }
+                                    },
+                                    ["required"] = new JsonArray("name", "type")
+                                }
+                            },
+                            ["copy_enabled"] = new JsonObject { ["type"] = "boolean" },
+                            ["copy_target_folder_urn"] = new JsonObject { ["type"] = "string" },
+                            ["dry_run"] = new JsonObject { ["type"] = "boolean", ["description"] = "Mặc định true (chỉ chạy thử)" },
+                            ["confirm_project"] = new JsonObject { ["type"] = "string", ["description"] = "Bắt buộc khi dry_run=false: đúng tên dự án đang chọn (xem trường project trong kết quả dry_run)" }
+                        },
+                        ["required"] = new JsonArray("name")
+                    }
                 },
                 new JsonObject
                 {
